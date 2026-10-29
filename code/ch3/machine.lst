@@ -1,0 +1,8 @@
+ 100:	b8 34 12             	mov    ax,0x1234
+ 103:	89 c3                	mov    bx,ax
+ 105:	04 05                	add    al,0x5
+ 107:	88 07                	mov    BYTE PTR [bx],al
+ 109:	41                   	inc    cx
+ 10a:	eb 01                	jmp    0x10d
+ 10c:	90                   	nop
+ 10d:	c3                   	ret    

@@ -1,0 +1,8 @@
+  401000:	66 01 d8             	add    ax,bx
+  401003:	01 d8                	add    eax,ebx
+  401005:	48 01 d8             	add    rax,rbx
+  401008:	4d 01 c8             	add    r8,r9
+  40100b:	eb 00                	jmp    40100d <fin>
+  40100d:	48 c7 c0 3c 00 00 00 	mov    rax,0x3c
+  401014:	48 31 ff             	xor    rdi,rdi
+  401017:	0f 05                	syscall 

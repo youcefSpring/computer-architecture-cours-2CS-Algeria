@@ -1,0 +1,14 @@
+ 100:	b8 00 00             	mov    ax,0x0
+ 103:	8e c0                	mov    es,ax
+ 105:	8d 06 19 01          	lea    ax,ds:0x119
+ 109:	26 a3 80 01          	mov    es:0x180,ax
+ 10d:	26 8c 0e 82 01       	mov    WORD PTR es:0x182,cs
+ 112:	b3 41                	mov    bl,0x41
+ 114:	cd 60                	int    0x60
+ 116:	cd 60                	int    0x60
+ 118:	c3                   	ret    
+ 119:	88 da                	mov    dl,bl
+ 11b:	b4 02                	mov    ah,0x2
+ 11d:	cd 21                	int    0x21
+ 11f:	fe c3                	inc    bl
+ 121:	cf                   	iret   

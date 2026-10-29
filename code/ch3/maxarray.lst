@@ -1,0 +1,10 @@
+ 100:	8d 36 16 01          	lea    si,ds:0x116
+ 104:	b9 06 00             	mov    cx,0x6
+ 107:	8a 04                	mov    al,BYTE PTR [si]
+ 109:	38 04                	cmp    BYTE PTR [si],al
+ 10b:	76 02                	jbe    0x10f
+ 10d:	8a 04                	mov    al,BYTE PTR [si]
+ 10f:	46                   	inc    si
+ 110:	e2 f7                	loop   0x109
+ 112:	a2 1c 01             	mov    ds:0x11c,al
+ 115:	c3                   	ret    

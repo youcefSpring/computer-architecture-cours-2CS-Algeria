@@ -1,0 +1,35 @@
+  401000:	48 b8 88 77 66 55 44 	movabs rax,0x1122334455667788
+  401007:	33 22 11 
+  40100a:	e8 44 00 00 00       	call   401053 <print_hex>
+  40100f:	48 b8 88 77 66 55 44 	movabs rax,0x1122334455667788
+  401016:	33 22 11 
+  401019:	b8 dd cc bb aa       	mov    eax,0xaabbccdd
+  40101e:	e8 30 00 00 00       	call   401053 <print_hex>
+  401023:	48 b8 88 77 66 55 44 	movabs rax,0x1122334455667788
+  40102a:	33 22 11 
+  40102d:	66 b8 34 12          	mov    ax,0x1234
+  401031:	e8 1d 00 00 00       	call   401053 <print_hex>
+  401036:	48 b8 88 77 66 55 44 	movabs rax,0x1122334455667788
+  40103d:	33 22 11 
+  401040:	b0 ff                	mov    al,0xff
+  401042:	e8 0c 00 00 00       	call   401053 <print_hex>
+  401047:	48 c7 c0 3c 00 00 00 	mov    rax,0x3c
+  40104e:	48 31 ff             	xor    rdi,rdi
+  401051:	0f 05                	syscall 
+  401053:	48 c7 c1 10 00 00 00 	mov    rcx,0x10
+  40105a:	48 8d 3d af 0f 00 00 	lea    rdi,[rip+0xfaf]        # 402010 <__bss_start>
+  401061:	48 c1 c0 04          	rol    rax,0x4
+  401065:	48 89 c2             	mov    rdx,rax
+  401068:	48 83 e2 0f          	and    rdx,0xf
+  40106c:	8a 92 00 20 40 00    	mov    dl,BYTE PTR [rdx+0x402000]
+  401072:	88 17                	mov    BYTE PTR [rdi],dl
+  401074:	48 ff c7             	inc    rdi
+  401077:	48 ff c9             	dec    rcx
+  40107a:	75 e5                	jne    401061 <next_digit>
+  40107c:	c6 07 0a             	mov    BYTE PTR [rdi],0xa
+  40107f:	48 c7 c0 01 00 00 00 	mov    rax,0x1
+  401086:	48 c7 c7 01 00 00 00 	mov    rdi,0x1
+  40108d:	48 8d 35 7c 0f 00 00 	lea    rsi,[rip+0xf7c]        # 402010 <__bss_start>
+  401094:	48 c7 c2 11 00 00 00 	mov    rdx,0x11
+  40109b:	0f 05                	syscall 
+  40109d:	c3                   	ret    

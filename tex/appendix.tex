@@ -1,0 +1,179 @@
+\appendix
+
+%================================================
+\chapter{ملخص تعليمات \textenglish{8086}}
+%================================================
+
+هذا الملحق يجمع في مكان واحد كل التعليمات التي درسناها في الفصل الثالث، لتعود إليها بسرعة أثناء كتابة
+برامجك. الرموز: \textenglish{d} الوجهة، \textenglish{s} المصدر، \textenglish{r} سجل، \textenglish{m} خانة ذاكرة.
+
+\section*{وظائف \textenglish{DOS} الأكثر استعمالًا (\code{int 21h})}
+\begin{center}
+\small
+\begin{tabular}{|c|l|l|}
+    \hline
+    \ras{\textenglish{AH}} & \ras{الوظيفة} & \ras{المدخلات / المخرجات} \\ \hline
+    \hex{01} & قراءة حرف مع إظهاره & المخرج في \textenglish{AL} \\ \hline
+    \hex{02} & كتابة حرف & الحرف في \textenglish{DL} \\ \hline
+    \hex{09} & كتابة سلسلة تنتهي بـ\code{\$} & العنوان في \textenglish{DX} \\ \hline
+    \hex{0A} & قراءة سطر في ذاكرة مؤقتة & العنوان في \textenglish{DX} \\ \hline
+    \hex{4C} & إنهاء البرنامج & الرمز في \textenglish{AL} \\ \hline
+\end{tabular}
+\end{center}
+
+\section*{التعليمات}
+
+\begin{center}
+\small\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\linewidth}{|l|>{\raggedleft\arraybackslash}X|l|}
+    \hline
+    \ras{التعليمة} & \ras{المعنى} & \ras{الأعلام المتأثرة} \\ \hline
+    \multicolumn{3}{|c|}{\cellcolor{brandOrange!20}\textbf{النقل}} \\ \hline
+    \code{mov d, s} & \nql{d}{s} & لا شيء \\ \hline
+    \code{xchg a, b} & تبادل \textenglish{a} و\textenglish{b} & لا شيء \\ \hline
+    \code{lea r, m} & \textenglish{r} يأخذ عنوان \textenglish{m} & لا شيء \\ \hline
+    \code{push s} & \nql{SP}{SP - 2}، ثم \nql{[SP]}{s} & لا شيء \\ \hline
+    \code{pop d} & \nql{d}{[SP]}، ثم \nql{SP}{SP + 2} & لا شيء \\ \hline
+    \code{in al, port} / \code{out port, al} & قراءة من منفذ / كتابة في منفذ & لا شيء \\ \hline
+    \multicolumn{3}{|c|}{\cellcolor{brandOrange!20}\textbf{الحساب}} \\ \hline
+    \code{add d, s} & \nql{d}{d + s} & كلها \\ \hline
+    \code{adc d, s} & \nql{d}{d + s + CF} & كلها \\ \hline
+    \code{sub d, s} & \nql{d}{d - s} & كلها \\ \hline
+    \code{sbb d, s} & \nql{d}{d - s - CF} & كلها \\ \hline
+    \code{inc d} & \nql{d}{d + 1} & كلها إلا \textenglish{CF} \\ \hline
+    \code{dec d} & \nql{d}{d - 1} & كلها إلا \textenglish{CF} \\ \hline
+    \code{neg d} & \nql{d}{-d} & كلها \\ \hline
+    \code{cmp a, b} & يحسب \textenglish{a - b} دون حفظ & كلها \\ \hline
+    \code{mul s} (8 بتات) & \nql{AX}{AL * s} & \textenglish{CF}، \textenglish{OF} \\ \hline
+    \code{mul s} (16 بتًا) & \nql{DX:AX}{AX * s} & \textenglish{CF}، \textenglish{OF} \\ \hline
+    \code{div s} (8 بتات) & \nql{AL}{AX / s}، \nql{AH}{AX mod s} & غير محددة \\ \hline
+    \code{div s} (16 بتًا) & \nql{AX}{DX:AX / s}، \nql{DX}{DX:AX mod s} & غير محددة \\ \hline
+    \multicolumn{3}{|c|}{\cellcolor{brandOrange!20}\textbf{المنطق والإزاحة}} \\ \hline
+    \code{and}، \code{or}، \code{xor} & عمليات بتًا ببت & \textenglish{CF = OF = 0}، \textenglish{ZF}، \textenglish{SF} \\ \hline
+    \code{not d} & قلب كل البتات & لا شيء \\ \hline
+    \code{test a, b} & \code{and} دون حفظ & مثل \code{and} \\ \hline
+    \code{shl d, n} / \code{shr d, n} & إزاحة: ضرب أو قسمة على $2^n$ & \textenglish{CF} = آخر بت خرج \\ \hline
+    \code{rol d, n} / \code{ror d, n} & تدوير & \textenglish{CF} \\ \hline
+    \multicolumn{3}{|c|}{\cellcolor{brandOrange!20}\textbf{التحكم في التدفق}} \\ \hline
+    \code{jmp L} & قفز دائمًا & لا شيء \\ \hline
+    \code{je}، \code{jne}، \code{jz}، \code{jnz} & حسب \textenglish{ZF} & -- \\ \hline
+    \code{jg}، \code{jge}، \code{jl}، \code{jle} & مقارنة \textbf{بإشارة} & -- \\ \hline
+    \code{ja}، \code{jae}، \code{jb}، \code{jbe} & مقارنة \textbf{دون إشارة} & -- \\ \hline
+    \code{loop L} & \nql{CX}{CX - 1}، ثم القفز إذا كان \textenglish{CX} $\neq 0$ & لا شيء \\ \hline
+    \code{jcxz L} & القفز إذا كان \textenglish{CX = 0} & -- \\ \hline
+    \code{call P} / \code{ret} & استدعاء إجراء / العودة منه & لا شيء \\ \hline
+    \code{int n} / \code{iret} & مقاطعة / العودة منها & \textenglish{IF = TF = 0} / تُستعاد \\ \hline
+    \multicolumn{3}{|c|}{\cellcolor{brandOrange!20}\textbf{السلاسل}} \\ \hline
+    \code{movsb} / \code{movsw} & \nql{ES:[DI]}{DS:[SI]}، ثم تقدم \textenglish{SI} و\textenglish{DI} & لا شيء \\ \hline
+    \code{rep} & كرر التعليمة \textenglish{CX} مرة & -- \\ \hline
+    \code{cld} / \code{std} & \textenglish{DF = 0} (تصاعدي) / \textenglish{DF = 1} & \textenglish{DF} \\ \hline
+\end{tabularx}
+\end{center}
+
+%================================================
+\chapter{\textenglish{EMU8086} و\textenglish{NASM}: الفروق في الكتابة}
+%================================================
+
+برامج الفصل الثالث مكتوبة لـ\textenglish{EMU8086} (صيغة قريبة من \textenglish{MASM})، وبرامج الفصل الرابع لـ\textenglish{NASM}.
+المعالج هو نفسه، لكن المجمِّعين لا يكتبان بعض الأشياء بالطريقة نفسها:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\raggedleft\arraybackslash}X|l|l|}
+    \hline
+    \ras{ما نريد} & \ras{\textenglish{EMU8086 / MASM}} & \ras{\textenglish{NASM}} \\ \hline
+    عنوان متغير في سجل & \code{lea dx, msg} أو \code{mov dx, offset msg} & \code{mov dx, msg} \\ \hline
+    قيمة متغير & \code{mov al, x} أو \code{mov al, [x]} & \code{mov al, [x]} (الأقواس إجبارية) \\ \hline
+    تحديد الحجم & \code{mov byte ptr [bx], 5} & \code{mov byte [bx], 5} \\ \hline
+    عدد ست عشري & \code{0FFh} & \code{0xFF} أو \code{0FFh} \\ \hline
+    إجراء & \code{p proc} \dots{} \code{p endp} & تسمية بسيطة \code{p:} \\ \hline
+    ثابت & \code{N equ 10} & \code{N equ 10} \\ \hline
+    جدول من 10 أصفار & \code{t db 10 dup(0)} & \code{t times 10 db 0} \\ \hline
+    التجميع & زر \textenglish{Emulate} & \code{nasm -f bin prog.asm -o prog.com} \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{intabih}
+    عادة جيدة: اكتب دائمًا الأقواس \code{[ ]} عندما تقصد محتوى الذاكرة، حتى في \textenglish{EMU8086}.
+    هكذا يبقى برنامجك واضحًا، ويعمل مع المجمِّعين بتعديلات قليلة. هذا ما فعلناه في كل برامج هذا الدرس.
+\end{intabih}
+
+%================================================
+\chapter{قاموس المصطلحات}
+%================================================
+
+\begin{center}
+\small
+\begin{tabular}{|l|l|l|}
+    \hline
+    \ras{بالعربية} & \ras{\textenglish{Français}} & \ras{\textenglish{English}} \\ \hline
+    الحاسوب & \textenglish{Ordinateur} & \textenglish{Computer} \\ \hline
+    المعالج & \textenglish{Processeur, UCT} & \textenglish{Processor, CPU} \\ \hline
+    الوحدة المركزية & \textenglish{Unité centrale} & \textenglish{Central unit} \\ \hline
+    الذاكرة المركزية & \textenglish{Mémoire centrale} & \textenglish{Main memory} \\ \hline
+    ذاكرة متطايرة & \textenglish{Mémoire volatile} & \textenglish{Volatile memory} \\ \hline
+    الحافلة & \textenglish{Bus} & \textenglish{Bus} \\ \hline
+    حافلة العناوين & \textenglish{Bus d'adresses} & \textenglish{Address bus} \\ \hline
+    حافلة المعطيات & \textenglish{Bus de données} & \textenglish{Data bus} \\ \hline
+    حافلة التحكم & \textenglish{Bus de contrôle} & \textenglish{Control bus} \\ \hline
+    السجل & \textenglish{Registre} & \textenglish{Register} \\ \hline
+    العدّاد البرنامجي & \textenglish{Compteur ordinal (CO)} & \textenglish{Program counter (PC)} \\ \hline
+    سجل التعليمة & \textenglish{Registre d'instruction (RI)} & \textenglish{Instruction register (IR)} \\ \hline
+    سجل عنوان الذاكرة & \textenglish{Registre d'adresse mémoire (RAM)} & \textenglish{Memory address register (MAR)} \\ \hline
+    سجل معطيات الذاكرة & \textenglish{Registre d'information mémoire (RIM)} & \textenglish{Memory data register (MDR)} \\ \hline
+    المركِّم & \textenglish{Accumulateur} & \textenglish{Accumulator} \\ \hline
+    العلم & \textenglish{Indicateur, drapeau} & \textenglish{Flag} \\ \hline
+    وحدة الحساب والمنطق & \textenglish{Unité arithmétique et logique (UAL)} & \textenglish{Arithmetic logic unit (ALU)} \\ \hline
+    وحدة التحكم & \textenglish{Unité de commande (UC)} & \textenglish{Control unit} \\ \hline
+    المفكك & \textenglish{Décodeur} & \textenglish{Decoder} \\ \hline
+    المتتالي & \textenglish{Séquenceur} & \textenglish{Sequencer} \\ \hline
+    نصف المجمّع & \textenglish{Demi-additionneur} & \textenglish{Half adder} \\ \hline
+    المجمّع الكامل & \textenglish{Additionneur complet} & \textenglish{Full adder} \\ \hline
+    المتمم لاثنين & \textenglish{Complément à deux} & \textenglish{Two's complement} \\ \hline
+    مجموعة التعليمات & \textenglish{Jeu d'instructions} & \textenglish{Instruction set} \\ \hline
+    الرمز العملي & \textenglish{Code opération} & \textenglish{Opcode} \\ \hline
+    نمط العنونة & \textenglish{Mode d'adressage} & \textenglish{Addressing mode} \\ \hline
+    العنوان الفعلي & \textenglish{Adresse effective} & \textenglish{Effective address} \\ \hline
+    العنوان الفيزيائي & \textenglish{Adresse physique} & \textenglish{Physical address} \\ \hline
+    المقطع والإزاحة & \textenglish{Segment, déplacement} & \textenglish{Segment, offset} \\ \hline
+    دورة التعليمة & \textenglish{Cycle d'instruction} & \textenglish{Instruction cycle} \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabular}{|l|l|l|}
+    \hline
+    \ras{بالعربية} & \ras{\textenglish{Français}} & \ras{\textenglish{English}} \\ \hline
+    الجلب، فك الترميز، التنفيذ & \textenglish{Recherche, décodage, exécution} & \textenglish{Fetch, decode, execute} \\ \hline
+    لغة التجميع & \textenglish{Langage d'assemblage} & \textenglish{Assembly language} \\ \hline
+    المجمِّع & \textenglish{Assembleur} & \textenglish{Assembler} \\ \hline
+    المكدس & \textenglish{Pile} & \textenglish{Stack} \\ \hline
+    الإجراء & \textenglish{Procédure, sous-programme} & \textenglish{Procedure, subroutine} \\ \hline
+    المقاطعة & \textenglish{Interruption} & \textenglish{Interrupt} \\ \hline
+    جدول أشعة المقاطعات & \textenglish{Table des vecteurs d'interruption} & \textenglish{Interrupt vector table} \\ \hline
+    المنفذ & \textenglish{Port d'E/S} & \textenglish{I/O port} \\ \hline
+    النمط المحمي & \textenglish{Mode protégé} & \textenglish{Protected mode} \\ \hline
+    النموذج المسطح & \textenglish{Modèle mémoire plat} & \textenglish{Flat memory model} \\ \hline
+    خط الأنابيب & \textenglish{Pipeline} & \textenglish{Pipeline} \\ \hline
+    التنبؤ بالقفز & \textenglish{Prédiction de branchement} & \textenglish{Branch prediction} \\ \hline
+    النواة & \textenglish{Cœur} & \textenglish{Core} \\ \hline
+    الخيط & \textenglish{Thread, fil d'exécution} & \textenglish{Thread} \\ \hline
+    الذاكرة المخبئية & \textenglish{Mémoire cache, antémémoire} & \textenglish{Cache memory} \\ \hline
+    سطر الذاكرة المخبئية & \textenglish{Ligne de cache} & \textenglish{Cache line} \\ \hline
+    الإصابة / الإخفاق & \textenglish{Succès / Défaut} & \textenglish{Hit / Miss} \\ \hline
+    المحلية الزمنية والمكانية & \textenglish{Localité temporelle et spatiale} & \textenglish{Temporal and spatial locality} \\ \hline
+\end{tabular}
+\end{center}
+
+\section*{المراجع}
+\begin{enumerate}
+    \item \textenglish{A. S. Tanenbaum, \emph{Structured Computer Organization}, Pearson, 2012.}
+    \item \textenglish{D. A. Patterson, J. L. Hennessy, \emph{Computer Organization and Design:}}\\ \textenglish{\emph{The Hardware/Software Interface}, Morgan Kaufmann.}
+    \item \textenglish{P. Zanella, Y. Ligier, E. Lazard, \emph{Architecture et technologie des ordinateurs}, 6e édition, Dunod, 2018.}
+    \item \textenglish{B. B. Brey, \emph{The Intel Microprocessors: 8086/8088 \dots{} Core2 with 64-bit Extensions}, Pearson.}
+    \item \textenglish{EMU8086, Microprocessor Emulator.}
+    \item \textenglish{NASM, The Netwide Assembler: https://www.nasm.us/}
+    \item \textenglish{MASM, Microsoft Macro Assembler reference:}\\ \textenglish{\small https://learn.microsoft.com/en-us/cpp/assembler/masm/}
+    \item \textenglish{GAS, The GNU Assembler: https://sourceware.org/binutils/docs/as/}
+\end{enumerate}

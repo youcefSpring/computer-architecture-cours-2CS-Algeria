@@ -1,0 +1,692 @@
+\chapter{البنية الداخلية للمعالج}
+
+\begin{khulasa}[: ماذا سنتعلم في هذا الفصل؟]
+\begin{itemize}
+    \item ما الموجود داخل المعالج، ودور كل جزء.
+    \item السجلات وأنواعها.
+    \item وحدة الحساب والمنطق: كيف يجمع المعالج عددين بالبوابات المنطقية، وما الأعلام.
+    \item وحدة التحكم: من يقرر ماذا يحدث في كل لحظة.
+    \item مجموعة التعليمات وأنماط العنونة.
+    \item المراحل التي تمر بها كل تعليمة: الجلب، فك الترميز، التنفيذ، الكتابة.
+\end{itemize}
+\end{khulasa}
+
+%================================================
+\section{نظرة إلى داخل المعالج}
+%================================================
+
+لنفتح المعالج ونرى ما بداخله. الشكل الآتي يمثل معالجًا بسيطًا، لكنه يحتوي على كل الأفكار
+الأساسية الموجودة في المعالجات الحقيقية.
+
+\begin{center}
+\begin{tikzpicture}[r/.style={reg, minimum width=1.5cm},
+    bus/.style={line width=3pt, color=brandTeal!70!black},
+    link/.style={thick, color=brandTeal!70!black},
+    sig/.style={dashed, thick, color=orangeDeep, -{Stealth[length=2mm]}}]
+    % processor frame
+    \draw[brandTeal, very thick, rounded corners=8pt, fill=brandTeal!4] (-8.4,-3.3) rectangle (2.2,3.4);
+    \node[font=\bfseries, lawn=tealDeep, anchor=north east] at (2.1,3.35) {المعالج};
+    % internal bus
+    \draw[bus] (-7.6,0) -- (1.8,0);
+    \node[font=\scriptsize, lawn=tealDeep] at (0.2,-0.3) {الحافلة الداخلية};
+    % control unit
+    \draw[orangeDeep, very thick, rounded corners=5pt, fill=brandOrange!12] (-8.1,0.5) rectangle (-4.9,3.0);
+    \node[font=\small\bfseries, lawn=orangeDeep] at (-6.5,2.7) {وحدة التحكم \textenglish{(UC)}};
+    \node[r] (ri) at (-6.5,2.05) {\textenglish{RI}};
+    \node[reg, font=\small, minimum width=1.3cm] (dec) at (-7.25,1.05) {المفكك};
+    \node[reg, font=\small, minimum width=1.3cm] (seq) at (-5.8,1.05) {المتتالي};
+    \draw[sahm] (ri) -- (dec);
+    \draw[sahm] (dec) -- (seq);
+    \draw[link] (ri.east) -- ++(0.35,0) |- (-4.55,0.35) -- (-4.55,0);
+    % clock
+    \node[unit=brandPurple, font=\small] (clk) at (-5.7,3.95) {الساعة};
+    \draw[sahm] (clk) -- (-5.7,3.0);
+    % registers above the bus
+    \node[r] (co) at (-2.6,2.3) {\textenglish{CO}};
+    \node[r] (ram) at (0.6,2.3) {\textenglish{RAM}};
+    \node[r] (rim) at (0.6,1.1) {\textenglish{RIM}};
+    \draw[sahmT] (co) -- node[above, font=\scriptsize] {عنوان التعليمة} (ram);
+    \node[font=\scriptsize, lawn=brandMuted] at (-2.6,1.65) {\textenglish{+1} بعد كل جلب};
+    \draw[link] (co.south) ++(0,-0.15) -- (-2.6,0);
+    \draw[link] (rim.south) -- (0.6,0);
+    % ALU with two inputs, ACC under it
+    \draw[brandGreen!70!black, very thick, fill=brandGreen!20]
+        (-5.4,-0.8) -- (-3.6,-0.8) -- (-4.0,-1.9) -- (-5.0,-1.9) -- cycle;
+    \node[font=\bfseries] at (-4.5,-1.35) {\textenglish{UAL}};
+    \node[r] (acc) at (-4.5,-2.75) {\textenglish{ACC}};
+    \node[r, font=\small] (fl) at (-2.3,-2.75) {الأعلام};
+    \draw[sahmT] (-4.5,-1.9) -- (acc.north) node[pos=0.5, right, font=\scriptsize] {النتيجة};
+    \draw[sahmT] (-3.8,-1.6) -| (fl.north);
+    \draw[sahm] (-3.9,0) -- (-3.9,-0.8) node[pos=0.5, right, font=\scriptsize] {المعامل 2};
+    \draw[sahm] (acc.west) -- ++(-0.9,0) |- (-6.0,-0.45) -| (-5.1,-0.8);
+    \node[font=\scriptsize, lawn=brandDark] at (-6.75,-1.6) {المعامل 1};
+    \draw[link] (acc.south) -- (-4.5,-3.2) -- (-1.0,-3.2) -- (-1.0,0);
+    % control signals
+    \draw[sig] (seq.south) -- (-5.8,0.15);
+    \node[font=\scriptsize, lawn=orangeDeep, align=center] at (-7.3,0.25) {إشارات التحكم};
+    % memory
+    \node[unit=brandPurple, minimum width=2cm, minimum height=4cm] (mem) at (4.4,1.2) {الذاكرة\\المركزية};
+    \draw[sahmO] (ram.east) -- node[above, font=\scriptsize] {حافلة العناوين} ([yshift=1.1cm]mem.west);
+    \draw[sahmT, {Stealth[length=2.6mm]}-{Stealth[length=2.6mm]}] (rim.east) -- node[below, font=\scriptsize] {حافلة المعطيات} ([yshift=-0.1cm]mem.west);
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{2.8cm}|R|}
+    \hline
+    \ras{العنصر} & \ras{دوره في جملة واحدة} \\ \hline
+    \textenglish{CO} (العدّاد البرنامجي) & يحفظ عنوان \textbf{التعليمة القادمة} \\ \hline
+    \textenglish{RI} (سجل التعليمة) & يحفظ \textbf{التعليمة الحالية} التي نفذها الآن \\ \hline
+    \textenglish{RAM} (سجل عنوان الذاكرة) & يحفظ العنوان الذي نرسله إلى الذاكرة \\ \hline
+    \textenglish{RIM} (سجل معطيات الذاكرة) & يحفظ المعطاة القادمة من الذاكرة أو الذاهبة إليها \\ \hline
+    \textenglish{ACC} (المركِّم) & يحفظ نتيجة الحساب \\ \hline
+    الأعلام & تحفظ معلومات عن آخر نتيجة: هل هي صفر؟ سالبة؟ \dots \\ \hline
+    \textenglish{UAL} & تنفذ العمليات الحسابية والمنطقية \\ \hline
+    المفكك والمتتالي & يفهمان التعليمة ويرسلان الأوامر بالترتيب الصحيح \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{intabih}
+    لا تخلط بين \textenglish{RAM} الذاكرة (\textenglish{Random Access Memory}) و\textenglish{RAM}
+    السجل (\textenglish{Registre d'Adresse Mémoire}) في الكتب الفرنسية. في الإنجليزية يسمى هذا
+    السجل \textenglish{MAR}، ويسمى \textenglish{RIM} سجل \textenglish{MDR}، ويسمى \textenglish{CO}
+    سجل \textenglish{PC} \textenglish{(Program Counter)}، وفي المعالج \textenglish{8086} نسميه \textenglish{IP}.
+\end{intabih}
+
+%================================================
+\section{السجلات}
+%================================================
+
+\begin{tarif}
+    \mustalah{السجل}{Registre}{Register}: خانة ذاكرة صغيرة جدًا (8 أو 16 أو 32 أو 64 بتًا)
+    موجودة \textbf{داخل المعالج}. هي أسرع ذاكرة في الحاسوب كله.
+\end{tarif}
+
+\begin{tashbih}
+    عندما تحل تمرينًا في الرياضيات، لا تذهب إلى المكتبة في كل مرة لتقرأ عددًا! تكتب الأعداد التي
+    تحتاجها على \textbf{ورقة المسودة} أمامك. السجلات هي ورقة المسودة للمعالج، والذاكرة هي المكتبة.
+\end{tashbih}
+
+\subsection{لماذا السجلات مهمة للسرعة؟}
+\begin{center}
+\begin{tabular}{|c|c|c|}
+    \hline
+    \ras{المكان} & \ras{زمن الوصول التقريبي} & \ras{لو كانت الدورة ثانية واحدة\dots} \\ \hline
+    سجل & أقل من \textenglish{1 ns} & ثانية واحدة \\ \hline
+    الذاكرة الرئيسية \textenglish{RAM} & حوالي \textenglish{80 ns} & دقيقة ونصف تقريبًا \\ \hline
+    قرص \textenglish{SSD} & حوالي \textenglish{100 µs} & أكثر من يوم \\ \hline
+\end{tabular}
+\end{center}
+لهذا نضع في السجلات المعطيات التي نستعملها كثيرًا، ونقلل من الذهاب إلى الذاكرة.
+
+\subsection{أنواع السجلات}
+\begin{enumerate}
+    \item \mustalah{سجلات المعطيات}{Registres de données}{Data registers}: تحفظ الأعداد التي نحسب بها
+          (مثل \textenglish{AX}، \textenglish{BX} في المعالج \textenglish{8086}).
+    \item \mustalah{سجلات العناوين}{Registres d'adresse}{Address registers}: تحفظ عناوين في
+          الذاكرة (مثل \textenglish{SI}، \textenglish{DI}، \textenglish{SP}).
+    \item \mustalah{سجلات التحكم والحالة}{Registres de contrôle}{Control registers}: تساعد المعالج
+          على تنظيم عمله: \textenglish{CO}، \textenglish{RI}، وسجل الأعلام.
+\end{enumerate}
+
+\begin{mithal}[: السجلات أثناء العمل]
+    المعالج ينفذ الآن التعليمة الموجودة في العنوان 11، وهي «اجمع \textenglish{ACC} مع محتوى الخانة 21».
+    \begin{itemize}
+        \item \textenglish{CO} يحتوي على 12: عنوان التعليمة \textbf{القادمة}، لا الحالية.
+        \item \textenglish{RI} يحتوي على التعليمة الحالية نفسها، لكي تقرأها وحدة التحكم طيلة تنفيذها.
+        \item \textenglish{RAM} يحتوي على 21: العنوان الذي نرسله الآن إلى الذاكرة.
+        \item \textenglish{RIM} يستقبل محتوى الخانة 21 القادم من الذاكرة.
+        \item \textenglish{ACC} يحتوي على العدد الأول، وسيستقبل النتيجة.
+    \end{itemize}
+    كل سجل له دور واضح، ولهذا تسمى سجلات خاصة، عكس السجلات العامة التي يستعملها المبرمج كما يشاء.
+\end{mithal}
+
+\subsection{سجل الأعلام}
+\begin{tarif}
+    \mustalah{العلم}{Indicateur, drapeau}{Flag}: بت واحد تضعه وحدة الحساب في 1 أو 0 حسب
+    نتيجة آخر عملية. نستعمل الأعلام بعد ذلك لاتخاذ القرارات (مثل: «إذا كانت النتيجة صفرًا، اقفز»).
+\end{tarif}
+
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{2.6cm}|R|R|}
+    \hline
+    \ras{العلم} & \ras{يصبح 1 عندما\dots} & \ras{مثال على 8 بتات} \\ \hline
+    \textenglish{ZF} (الصفر) & تكون النتيجة \textbf{صفرًا} & $5 - 5 = 0$ \\ \hline
+    \textenglish{CF} (الحمل) & يخرج حمل من آخر بت (النتيجة أكبر من السعة) & $200 + 100 = 300 > 255$ \\ \hline
+    \textenglish{SF} (الإشارة) & يكون البت الأخير للنتيجة 1 (عدد سالب) & $3 - 7 = -4$ \\ \hline
+    \textenglish{OF} (الفيضان) & تكون النتيجة خاطئة إذا اعتبرنا الأعداد بإشارة & $100 + 50 = 150 > 127$ \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{الفرق بين \textenglish{CF} و\textenglish{OF}}
+البايت نفسه يمكن قراءته بطريقتين، والمعالج لا يعرف أي طريقة يقصدها المبرمج:
+\begin{itemize}
+    \item \textbf{دون إشارة} \textenglish{(unsigned)}: القيم من 0 إلى 255.
+    \item \textbf{بإشارة} \textenglish{(signed)}: القيم من $-128$ إلى $+127$. البت الأخير (البت 7) يدل على الإشارة: 1 = سالب.
+\end{itemize}
+لذلك يحسب المعالج العلمين معًا: \textenglish{CF} يهم من يعمل بأعداد دون إشارة، و\textenglish{OF} يهم من يعمل
+بأعداد بإشارة.
+
+\begin{khatwa}[: $100 + 50$ على 8 بتات]
+    \begin{enumerate}
+        \item $100 = $ \bin{0110\,0100} و$50 = $ \bin{0011\,0010}.
+        \item المجموع: $\bin{1001\,0110} = 150$ (دون إشارة). لا حمل من البت 7، إذن \textenglish{CF = 0}: صحيح لمن يعمل دون إشارة.
+        \item لكن البت 7 أصبح 1! من يقرأ بإشارة يرى عددًا سالبًا: $150 - 256 = -106$.
+        \item جمعنا عددين موجبين فحصلنا على عدد سالب: هذا مستحيل، إذن النتيجة خاطئة بإشارة، و\textenglish{OF = 1}.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{intabih}
+    قاعدة سهلة لـ\textenglish{OF}: يحدث الفيضان عندما نجمع عددين \textbf{من الإشارة نفسها} فنحصل على نتيجة
+    \textbf{من الإشارة الأخرى}. جمع موجب مع سالب لا يسبب فيضانًا أبدًا.
+\end{intabih}
+
+%================================================
+\section{وحدة الحساب والمنطق \textenglish{(UAL)}}
+%================================================
+
+\begin{tarif}
+    \mustalah{وحدة الحساب والمنطق}{Unité Arithmétique et Logique, UAL}{Arithmetic Logic Unit, ALU}:
+    الجزء الذي ينفذ العمليات الحسابية (الجمع، الطرح، المقارنة\dots) والمنطقية (\textenglish{AND}،
+    \textenglish{OR}، \textenglish{XOR}، \textenglish{NOT}، الإزاحة).
+\end{tarif}
+
+\begin{center}
+\begin{tikzpicture}
+    \draw[brandGreen!70!black, very thick, fill=brandGreen!20]
+        (-2.2,1) -- (-0.4,1) -- (0,0.4) -- (0.4,1) -- (2.2,1) -- (1.2,-1) -- (-1.2,-1) -- cycle;
+    \node[font=\bfseries\large] at (0,-0.2) {\textenglish{UAL}};
+    \draw[sahmT] (-1.3,2) node[above, font=\small] {المعامل \textenglish{A}} -- (-1.3,1);
+    \draw[sahmT] (1.3,2) node[above, font=\small] {المعامل \textenglish{B}} -- (1.3,1);
+    \draw[sahmO] (3.6,0) node[right, font=\small] {العملية (من وحدة التحكم)} -- (1.7,0);
+    \draw[sahmT] (0,-1) -- (0,-2) node[below, font=\small] {النتيجة};
+    \draw[sahm] (-1.6,-0.2) -- (-3.4,-0.2) node[left, font=\small] {الأعلام \textenglish{ZF, CF, SF, OF}};
+\end{tikzpicture}
+\end{center}
+
+\subsection{كيف تجمع البوابات المنطقية؟ نصف المجمّع}
+
+لنجمع بتين $A$ و$B$. هناك أربع حالات فقط:
+
+\begin{center}
+\begin{tabular}{|c|c||c|c|}
+    \hline
+    \ras{$A$} & \ras{$B$} & \ras{المجموع $S$} & \ras{الحمل $C$} \\ \hline
+    0 & 0 & 0 & 0 \\ \hline
+    0 & 1 & 1 & 0 \\ \hline
+    1 & 0 & 1 & 0 \\ \hline
+    1 & 1 & 0 & \cell{orangeDeep}{\textbf{1}} \\ \hline
+\end{tabular}
+\end{center}
+
+نلاحظ أن: $S$ يساوي 1 عندما يكون بت واحد فقط يساوي 1، وهذه هي البوابة \textenglish{XOR}.
+و$C$ يساوي 1 عندما يكون البتان يساويان 1، وهذه هي البوابة \textenglish{AND}.
+
+\begin{tarif}
+    \mustalah{نصف المجمّع}{Demi-additionneur}{Half adder}: \quad
+    $S = A \oplus B$ \quad و\quad $C = A \cdot B$
+\end{tarif}
+
+\begin{center}
+\begin{tikzpicture}[gate/.style={draw=brandDark, fill=white, thick, minimum width=1.5cm,
+        minimum height=0.9cm, font=\codefont\bfseries, rounded corners=2pt}]
+    \node[gate] (x) at (0,0.8) {\textenglish{XOR}};
+    \node[gate] (a) at (0,-0.8) {\textenglish{AND}};
+    \node[font=\bfseries] (A) at (-3.2,0.4) {\textenglish{A}};
+    \node[font=\bfseries] (B) at (-3.2,-0.4) {\textenglish{B}};
+    \fill (-2,0.4) circle (2pt); \fill (-1.5,-0.4) circle (2pt);
+    \draw[thick] (A) -- (-2,0.4) |- ([yshift=0.15cm]x.west);
+    \draw[thick] (-2,0.4) |- ([yshift=0.15cm]a.west);
+    \draw[thick] (B) -- (-1.5,-0.4) |- ([yshift=-0.15cm]x.west);
+    \draw[thick] (-1.5,-0.4) |- ([yshift=-0.15cm]a.west);
+    \draw[sahmT] (x.east) -- (2,0.8) node[right] {\textenglish{S}};
+    \draw[sahmO] (a.east) -- (2,-0.8) node[right] {\textenglish{C}};
+\end{tikzpicture}
+\end{center}
+
+\subsection{المجمّع الكامل}
+لجمع أعداد من عدة بتات، نحتاج أن نضيف \textbf{الحمل القادم} من البت السابق. المجمّع الكامل
+له ثلاثة مداخل: $A$ و$B$ والحمل الداخل $C_{in}$.
+
+\begin{tarif}
+    \mustalah{المجمّع الكامل}{Additionneur complet}{Full adder}: \quad
+    $S = A \oplus B \oplus C_{in}$ \quad و\quad
+    $C_{out} = A \cdot B + C_{in} \cdot (A \oplus B)$
+\end{tarif}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c||c|c|}
+    \hline
+    \ras{$A$} & \ras{$B$} & \ras{$C_{in}$} & \ras{$S$} & \ras{$C_{out}$} \\ \hline
+    0&0&0&0&0 \\ \hline 0&0&1&1&0 \\ \hline 0&1&0&1&0 \\ \hline 0&1&1&0&1 \\ \hline
+    1&0&0&1&0 \\ \hline 1&0&1&0&1 \\ \hline 1&1&0&0&1 \\ \hline 1&1&1&1&1 \\ \hline
+\end{tabular}
+\end{center}
+
+\subsection{مجمّع 4 بتات}
+نضع 4 مجمّعات كاملة جنبًا إلى جنب: الحمل الخارج من كل واحد يدخل في الذي بعده،
+تمامًا كما نفعل عند الجمع بالورقة والقلم.
+
+\begin{center}
+\begin{tikzpicture}[fa/.style={draw=brandTeal, fill=brandTeal!15, very thick, minimum width=1.6cm,
+        minimum height=1.1cm, font=\codefont\bfseries, rounded corners=3pt}]
+    \foreach \i/\x in {0/0, 1/-3, 2/-6, 3/-9} {
+        \node[fa] (f\i) at (\x,0) {\textenglish{FA}};
+        \draw[thick] ([xshift=-0.35cm]f\i.north) -- ++(0,0.6) node[above, font=\small] {\textenglish{A\i}};
+        \draw[thick] ([xshift=0.35cm]f\i.north) -- ++(0,0.6) node[above, font=\small] {\textenglish{B\i}};
+        \draw[sahmT] (f\i.south) -- ++(0,-0.6) node[below, font=\small] {\textenglish{S\i}};
+    }
+    \draw[sahmO] (1.7,0) node[right, font=\small] {\textenglish{0}} -- (f0.east);
+    \draw[sahmO] (f0.west) -- (f1.east);
+    \draw[sahmO] (f1.west) -- (f2.east);
+    \draw[sahmO] (f2.west) -- (f3.east);
+    \draw[sahmO] (f3.west) -- ++(-0.9,0) node[left, font=\small] {\textenglish{CF}};
+\end{tikzpicture}
+\end{center}
+
+\begin{khatwa}[: جمع $0111 + 0110$ (أي $7 + 6$) بالمجمّع]
+    \begin{center}
+    \begin{tabular}{|c|c|c|c|c|c|}
+        \hline
+        \ras{البت} & \ras{$A$} & \ras{$B$} & \ras{$C_{in}$} & \ras{$S$} & \ras{$C_{out}$} \\ \hline
+        0 & 1 & 0 & 0 & 1 & 0 \\ \hline
+        1 & 1 & 1 & 0 & 0 & 1 \\ \hline
+        2 & 1 & 1 & 1 & 1 & 1 \\ \hline
+        3 & 0 & 0 & 1 & 1 & 0 \\ \hline
+    \end{tabular}
+    \end{center}
+    نقرأ $S$ من البت 3 إلى البت 0: $1101 = 13$، وهو فعلًا $7 + 6$. الحمل الأخير 0، إذن \textenglish{CF = 0}.
+\end{khatwa}
+
+\subsection{والطرح؟ نستعمل المجمّع نفسه!}
+لا يحتاج المعالج إلى دارة خاصة للطرح. يستعمل فكرة \mustalah{المتمم لاثنين}{Complément à deux}{Two's complement}:
+$A - B = A + (-B)$، و$-B$ نحصل عليه بقلب كل بتات $B$ ثم إضافة 1.
+
+\begin{khatwa}[: $7 - 5$ على 4 بتات]
+    \begin{enumerate}
+        \item $5 = 0101$. نقلب البتات: $1010$. نضيف 1: $1011$. إذن $-5 = 1011$.
+        \item نجمع: $0111 + 1011 = 1\,0010$. الحمل الخارج نتركه، فيبقى $0010 = 2$.
+        \item النتيجة $7 - 5 = 2$. صحيح! والدارة نفسها جمعت وطرحت.
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{المقارنة بالطرح}
+لا يحتاج المعالج إلى دارة خاصة للمقارنة: ليقارن $A$ و$B$ يحسب $A - B$ \textbf{دون أن يحفظ النتيجة}،
+ثم ينظر إلى الأعلام:
+\begin{itemize}
+    \item إذا كان \textenglish{ZF = 1} فإن $A = B$.
+    \item إذا كان \textenglish{CF = 1} (حدث «استلاف») فإن $A < B$ (للأعداد دون إشارة).
+\end{itemize}
+
+\subsection{تجربة حقيقية: كيف تتغير الأعلام؟}
+نفذنا البرنامج الآتي على المعالج \textenglish{8086}. لا تقلق إن لم تفهم كل التعليمات الآن،
+سندرسها في الفصل الثالث؛ ركّز فقط على الأعلام.
+
+\asm{ch2/flags.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|c|c|c|}
+    \hline
+    \ras{السطر} & \ras{التعليمة} & \ras{\textenglish{AL}} & \ras{\textenglish{CF}} & \ras{\textenglish{ZF}} & \ras{\textenglish{SF}} & \ras{\textenglish{OF}} \\ \hline
+    4 & \code{add al, 100} ($200 + 100$) & $\hex{2C} = 44$ & \cell{orangeDeep}{\textbf{1}} & 0 & 0 & 0 \\ \hline
+    5 & \code{mov al, 100} & $\hex{64} = 100$ & 1 & 0 & 0 & 0 \\ \hline
+    6 & \code{add al, 50} ($100 + 50$) & $\hex{96} = 150$ & 0 & 0 & 1 & \cell{orangeDeep}{\textbf{1}} \\ \hline
+    8 & \code{sub al, 5} ($5 - 5$) & $\hex{00} = 0$ & 0 & \cell{orangeDeep}{\textbf{1}} & 0 & 0 \\ \hline
+    10 & \code{sub al, 7} ($3 - 7$) & $\hex{FC} = 252$ & \cell{orangeDeep}{\textbf{1}} & 0 & \cell{orangeDeep}{\textbf{1}} & 0 \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: لماذا $200 + 100$ أعطى 44؟]
+    \begin{enumerate}
+        \item $200 + 100 = 300$، لكن \textenglish{AL} يحتوي على 8 بتات فقط، أي من 0 إلى 255.
+        \item $300 - 256 = 44$: يبقى في \textenglish{AL} العدد 44، و«الـ256» التي لم تجد مكانًا تذهب إلى
+              العلم \textenglish{CF}، فيصبح \textenglish{CF = 1}.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{intabih}
+    لاحظ السطر 5: التعليمة \code{mov} \textbf{لا تغيّر الأعلام}، لذلك بقي \textenglish{CF = 1}. فقط
+    تعليمات الحساب والمنطق تغيّر الأعلام.
+\end{intabih}
+
+%================================================
+\section{وحدة التحكم \textenglish{(UC)}}
+%================================================
+
+\begin{tarif}
+    \mustalah{وحدة التحكم}{Unité de Commande, UC}{Control Unit}: الجزء الذي يقرأ التعليمات
+    ويفهمها، ثم يرسل في كل نبضة ساعة \textbf{إشارات} إلى باقي الأجزاء (افتح هذا السجل، اجمع،
+    اقرأ من الذاكرة\dots) بالترتيب الصحيح.
+\end{tarif}
+
+\begin{tashbih}
+    وحدة التحكم هي \textbf{قائد الأوركسترا}: لا يعزف أي آلة بنفسه، لكنه يقول لكل عازف متى يبدأ ومتى
+    يتوقف. بدونه يعزف الجميع في الوقت نفسه فتصبح ضوضاء.
+\end{tashbih}
+
+مكوناتها الأساسية:
+\begin{itemize}
+    \item \textbf{سجل التعليمة} \textenglish{(RI)}: يحفظ التعليمة الحالية.
+    \item \mustalah{المفكك}{Décodeur}{Decoder}: يقرأ الرمز العملي \textenglish{(opcode)} ويعرف
+          ما المطلوب: جمع؟ نقل؟ قفز؟
+    \item \mustalah{المتتالي}{Séquenceur}{Sequencer}: يرسل الإشارات المناسبة، واحدة بعد الأخرى،
+          على إيقاع الساعة.
+\end{itemize}
+
+\subsection{الأوامر الدقيقة نبضة بنبضة}
+كل مرحلة من مراحل التعليمة تنقسم إلى خطوات صغيرة جدًا تسمى \mustalah{العمليات الدقيقة}{Micro-opérations}{Micro-operations}.
+في كل نبضة ساعة يرسل المتتالي إشارات تفتح «أبوابًا» بين السجلات. هذا مثال لجلب تعليمة:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|c|R|R|}
+    \hline
+    \ras{النبضة} & \ras{العملية الدقيقة} & \ras{الإشارة التي يرسلها المتتالي} \\ \hline
+    \textenglish{T1} & \nql{RAM}{CO} & «انسخ \textenglish{CO} في \textenglish{RAM}» \\ \hline
+    \textenglish{T2} & \nql{RIM}{[RAM]}، \nql{CO}{CO + 1} & «اقرأ من الذاكرة» و«زِد \textenglish{CO}» \\ \hline
+    \textenglish{T3} & \nql{RI}{RIM} & «انسخ \textenglish{RIM} في \textenglish{RI}» \\ \hline
+    \textenglish{T4}\dots & حسب التعليمة & المفكك يختار الإشارات التالية \\ \hline
+\end{tabularx}
+\end{center}
+نلاحظ أن الجلب متشابه في كل التعليمات، أما ما بعده فيختلف حسب الرمز العملي.
+
+\subsection{نوعان من وحدات التحكم}
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.2cm}|R|R|}
+    \hline
+    \ras{} & \ras{المبرمجة بالأسلاك \textenglish{(câblée)}} & \ras{المبرمجة دقيقًا \textenglish{(microprogrammée)}} \\ \hline
+    المبدأ & دارة منطقية ثابتة تولّد الإشارات & كل تعليمة = برنامج صغير مخزن في ذاكرة داخلية \\ \hline
+    السرعة & سريعة جدًا & أبطأ قليلًا \\ \hline
+    التعديل & صعب (يجب تغيير الدارة) & سهل (نغيّر البرنامج الدقيق) \\ \hline
+    أين نجدها & معالجات \textenglish{RISC} & معالجات \textenglish{CISC} مثل \textenglish{8086} \\ \hline
+\end{tabularx}
+\end{center}
+
+%================================================
+\section{مجموعة التعليمات}
+%================================================
+
+\begin{tarif}
+    \mustalah{مجموعة التعليمات}{Jeu d'instructions}{Instruction Set}: قائمة كل التعليمات التي
+    يعرف المعالج تنفيذها. كل معالج له مجموعته الخاصة.
+\end{tarif}
+
+\subsection{شكل التعليمة}
+كل تعليمة في لغة الآلة تتكون من جزأين:
+
+\begin{center}
+\begin{tikzpicture}
+    \node[draw=brandOrange, fill=brandOrange!20, thick, minimum width=3.5cm, minimum height=1cm, font=\bfseries] (op) at (0,0) {الرمز العملي};
+    \node[draw=brandTeal, fill=brandTeal!20, thick, minimum width=5cm, minimum height=1cm, font=\bfseries, anchor=east] (oper) at (op.west) {المعاملات};
+    \node[below=0.15cm of op, font=\small] {\textenglish{opcode}: ماذا نفعل؟};
+    \node[below=0.15cm of oper, font=\small] {\textenglish{operands}: على ماذا نعمل؟};
+    \node[above=0.2cm of op, font=\codefont] {\textenglish{ADD}};
+    \node[above=0.2cm of oper, font=\codefont] {\textenglish{AX, 5}};
+\end{tikzpicture}
+\end{center}
+
+\begin{tarif}
+    \mustalah{لغة التجميع}{Langage d'assemblage}{Assembly language}: كتابة التعليمات بكلمات قصيرة
+    يفهمها الإنسان (\code{ADD}، \code{MOV}) بدل الأعداد الثنائية. برنامج \mustalah{المجمِّع}{Assembleur}{Assembler}
+    يحوّلها إلى لغة الآلة (أصفار وآحاد).
+\end{tarif}
+
+\begin{mithal}
+    في المعالج \textenglish{8086}، التعليمة \code{add al, 5} تُكتب في لغة الآلة بالبايتين \textenglish{04 05}، أي
+    \textenglish{0000 0100 0000 0101}: البايت الأول هو الرمز العملي «أضف قيمة فورية إلى \textenglish{AL}»، والثاني هو العدد 5.
+    المبرمج يكتب \code{add al, 5}، والمجمِّع يكتب الأصفار والآحاد بدلًا منه (سنرى ذلك بالتفصيل في الفصل الثالث).
+\end{mithal}
+
+\subsection{كم تعليمة يمكن أن يملك المعالج؟}
+إذا كان الرمز العملي مكتوبًا على $k$ بتات، فهناك $2^k$ رمزًا مختلفًا، أي $2^k$ تعليمة على الأكثر.
+
+\begin{khatwa}
+    رمز عملي من 6 بتات: $2^6 = 64$ تعليمة ممكنة. رمز من 8 بتات: $2^8 = 256$ تعليمة.
+\end{khatwa}
+
+\subsection{عدد العناوين في التعليمة}
+لنحسب \textenglish{A = B + C} في أربعة أنواع من الآلات. كلما قلّ عدد المعاملات في التعليمة، قصرت
+التعليمة، لكن احتجنا إلى تعليمات أكثر:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}p{3cm}|}
+    \hline
+    \ras{نوع الآلة} & \ras{البرنامج} & \ras{عدد التعليمات} \\ \hline
+    3 عناوين & \code{ADD A, B, C} & 1 \\ \hline
+    عنوانان & \code{MOV A, B} ثم \code{ADD A, C} & 2 \\ \hline
+    عنوان واحد (بمركِّم) & \code{LOAD B} ثم \code{ADD C} ثم \code{STORE A} & 3 \\ \hline
+    دون عنوان (بمكدس) & \code{PUSH B}، \code{PUSH C}، \code{ADD}، \code{POP A} & 4 \\ \hline
+\end{tabularx}
+\end{center}
+المعالج \textenglish{8086} آلة \textbf{بعنوانين}: \code{add ax, bx} تعني $\text{AX} \leftarrow \text{AX} + \text{BX}$.
+
+\subsection{أصناف التعليمات}
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.5cm}|R|>{\centering\arraybackslash}p{4.2cm}|}
+    \hline
+    \ras{الصنف} & \ras{الدور} & \ras{أمثلة (\textenglish{8086})} \\ \hline
+    نقل المعطيات & نسخ قيمة من مكان إلى آخر & \code{MOV}، \code{PUSH}، \code{POP} \\ \hline
+    الحساب & الجمع، الطرح، الضرب، القسمة & \code{ADD}، \code{SUB}، \code{MUL}، \code{INC} \\ \hline
+    المنطق & العمليات على البتات & \code{AND}، \code{OR}، \code{XOR}، \code{SHL} \\ \hline
+    التحكم في التدفق & القفز وتغيير ترتيب التنفيذ & \code{JMP}، \code{JE}، \code{CALL}، \code{RET} \\ \hline
+    الإدخال والإخراج & التواصل مع الأجهزة & \code{IN}، \code{OUT}، \code{INT} \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{\textenglish{CISC} و\textenglish{RISC}}
+\begin{itemize}
+    \item \textbf{\textenglish{CISC}} \textenglish{(Complex Instruction Set Computer)}: تعليمات كثيرة
+          ومعقدة، بعضها يقوم بعمل كبير. مثال: \textenglish{Intel x86}.
+    \item \textbf{\textenglish{RISC}} \textenglish{(Reduced Instruction Set Computer)}: تعليمات قليلة
+          وبسيطة وسريعة، كلها بالطول نفسه. مثال: \textenglish{ARM} في الهواتف، \textenglish{RISC-V}.
+\end{itemize}
+
+%================================================
+\section{أنماط العنونة}
+%================================================
+
+\begin{tarif}
+    \mustalah{نمط العنونة}{Mode d'adressage}{Addressing mode}: الطريقة التي نحدد بها
+    \textbf{أين توجد المعطاة} التي تعمل عليها التعليمة.
+\end{tarif}
+
+\begin{tashbih}
+    تريد أن تعطي صديقك كتابًا:
+    \textbf{(1)} تعطيه الكتاب في يده (فوري)،
+    \textbf{(2)} تقول له: «الكتاب على الرف رقم 12» (مباشر)،
+    \textbf{(3)} تقول له: «انظر في الورقة الموجودة في جيبي، فيها رقم الرف» (غير مباشر)،
+    \textbf{(4)} تقول: «الرف الثالث بعد الرف رقم 10» (مفهرس).
+\end{tashbih}
+
+\subsection{الأنماط الأساسية}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{2.4cm}|>{\centering\arraybackslash}p{3.3cm}|R|}
+    \hline
+    \ras{النمط} & \ras{مثال \textenglish{8086}} & \ras{أين المعطاة؟} \\ \hline
+    فوري \textenglish{(immédiat)} & \code{mov ax, 5} & داخل التعليمة نفسها \\ \hline
+    سجلي \textenglish{(registre)} & \code{mov bx, ax} & في سجل \\ \hline
+    مباشر \textenglish{(direct)} & \code{mov cx, [val]} & في الذاكرة، وعنوانها مكتوب في التعليمة \\ \hline
+    غير مباشر \textenglish{(indirect)} & \code{mov dx, [si]} & في الذاكرة، وعنوانها موجود في سجل \\ \hline
+    مفهرس \textenglish{(indexé)} & \code{mov ax, [tab+di]} & العنوان = عنوان بداية + قيمة سجل الفهرس \\ \hline
+    نسبي \textenglish{(relatif)} & \code{jmp suite} & العنوان = العنوان الحالي + إزاحة (للقفز) \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{متى نستعمل كل نمط؟}
+\begin{itemize}
+    \item \textbf{الفوري}: للثوابت (عدد الدورات، القيمة الأولية). أسرع نمط، لأن القيمة وصلت مع التعليمة،
+          فلا نذهب إلى الذاكرة. لكن لا يمكن تغييرها أثناء التنفيذ.
+    \item \textbf{السجلي}: للحسابات السريعة بين قيم موجودة داخل المعالج. سريع جدًا أيضًا.
+    \item \textbf{المباشر}: للمتغيرات التي لها مكان ثابت في الذاكرة (مثل متغير عام). نحتاج إلى قراءة واحدة من الذاكرة.
+    \item \textbf{غير المباشر}: عندما لا نعرف العنوان عند كتابة البرنامج، بل نحسبه أثناء التنفيذ. هو أساس
+          \textbf{المؤشرات} في لغة \textenglish{C}.
+    \item \textbf{المفهرس}: للجداول: نثبت عنوان البداية، ونغيّر الفهرس في كل دورة من الحلقة لنمر على كل العناصر.
+    \item \textbf{النسبي}: للقفزات. بما أن المسافة نسبية، يعمل البرنامج حتى لو حُمّل في مكان آخر من الذاكرة.
+\end{itemize}
+
+\begin{khatwa}[: كم مرة نذهب إلى الذاكرة؟]
+    \begin{center}
+    \begin{tabular}{|l|c|}
+        \hline \ras{التعليمة} & \ras{قراءات الذاكرة لجلب المعطاة} \\ \hline
+        \code{mov ax, 5} (فوري) & 0 \\ \hline
+        \code{mov ax, bx} (سجلي) & 0 \\ \hline
+        \code{mov ax, [val]} (مباشر) & 1 \\ \hline
+        \code{mov ax, [si]} (غير مباشر بسجل) & 1 \\ \hline
+        غير مباشر بالذاكرة (العنوان نفسه في الذاكرة) & 2 \\ \hline
+    \end{tabular}
+    \end{center}
+    كل ذهاب إلى الذاكرة يكلف وقتًا، لذلك يحاول المبرمج إبقاء المعطيات المهمة في السجلات.
+\end{khatwa}
+
+\subsection{الأنماط في برنامج حقيقي}
+\asm{ch2/modes.asm}
+
+\begin{center}
+\begin{tikzpicture}[cellx/.style={draw=brandDark, fill=white, minimum width=2cm, minimum height=0.55cm, font=\codefont\small},
+    addr/.style={font=\codefont\small, lawn=tealDeep}]
+    \foreach \a/\v/\n [count=\i from 0] in {0117/1234/val, 0119/000A/tab, 011B/0014/{}, 011D/001E/{}} {
+        \node[cellx] (c\i) at (0, -0.55*\i) {\textenglish{\v}};
+        \node[addr, right=0.15cm of c\i] {\textenglish{\a}};
+        \node[font=\codefont\small, left=0.15cm of c\i] {\textenglish{\n}};
+    }
+    \node[font=\small\bfseries] at (0,0.55) {الذاكرة};
+    \draw[sahmO] (2.9,-0.55) -- (2.9,-1.65) node[midway, right, font=\scriptsize] {\textenglish{+4}};
+\end{tikzpicture}
+\end{center}
+
+\begin{sharh}
+    \s{1}{برنامج من النوع \textenglish{.COM}: يبدأ في العنوان \hex{100}.}
+    \s{3}{\textbf{فوري}: العدد 5 مكتوب داخل التعليمة. النتيجة: \textenglish{AX = 0005}.}
+    \s{4}{\textbf{سجلي}: ننسخ \textenglish{AX} في \textenglish{BX}. النتيجة: \textenglish{BX = 0005}.}
+    \s{5}{\textbf{مباشر}: نقرأ الذاكرة في عنوان \code{val} (\hex{0117}). النتيجة: \textenglish{CX = 1234}.}
+    \s{6}{\code{lea} تضع \textbf{عنوان} \code{val} (لا قيمته) في \textenglish{SI}: \textenglish{SI = 0117}.}
+    \s{7}{\textbf{غير مباشر}: نقرأ الذاكرة في العنوان الموجود في \textenglish{SI}. النتيجة: \textenglish{DX = 1234}.}
+    \s{8}{\textenglish{DI = 4}: كل عنصر من \code{tab} كلمة (بايتان)، إذن العنصر الثالث على بعد 4 بايتات.}
+    \s{9}{\textbf{مفهرس}: العنوان $\hex{0119} + 4 = \hex{011D}$، وفيه 30. النتيجة: \textenglish{AX = 001E}.}
+    \s{10}{نهاية البرنامج والعودة إلى النظام.}
+\end{sharh}
+
+\begin{intabih}
+    القوسان \code{[ ]} يعنيان دائمًا: «\textbf{محتوى الذاكرة} في هذا العنوان». \code{mov dx, si}
+    ينسخ العدد \hex{0117} نفسه، أما \code{mov dx, [si]} فيقرأ ما هو مخزن في العنوان \hex{0117}.
+\end{intabih}
+
+%================================================
+\section{مراحل تنفيذ تعليمة}
+%================================================
+
+كل تعليمة، مهما كانت بسيطة، تمر بالمراحل نفسها. نسمي ذلك \mustalah{دورة التعليمة}{Cycle d'instruction}{Instruction cycle}.
+
+\begin{center}
+\begin{tikzpicture}
+    \foreach \a/\t/\c/\d in {90/{1. الجلب\\\textenglish{Fetch}}/brandTeal/{نقرأ التعليمة من الذاكرة},
+                             0/{2. فك الترميز\\\textenglish{Decode}}/brandOrange/{نفهم ما المطلوب},
+                             -90/{3. التنفيذ\\\textenglish{Execute}}/brandGreen/{نقوم بالعملية},
+                             180/{4. الكتابة\\\textenglish{Write back}}/brandPurple/{نحفظ النتيجة}} {
+        \node[unit=\c, minimum width=2.9cm, minimum height=1.2cm] (n\a) at (\a:2.6) {\t};
+    }
+    \draw[sahmT] (n90) to[bend left=25] (n0);
+    \draw[sahmT] (n0) to[bend left=25] (n-90);
+    \draw[sahmT] (n-90) to[bend left=25] (n180);
+    \draw[sahmT] (n180) to[bend left=25] (n90);
+    \node[font=\small, text width=3cm, align=center] at (0,0) {ثم نعيد\\مع التعليمة التالية};
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}
+    \item \textbf{الجلب}: يُرسل \textenglish{CO} إلى \textenglish{RAM}، نقرأ الذاكرة، تصل التعليمة إلى
+          \textenglish{RIM} ثم إلى \textenglish{RI}. ثم يزيد \textenglish{CO} ليشير إلى التعليمة التالية.
+    \item \textbf{فك الترميز}: يقرأ المفكك الرمز العملي الموجود في \textenglish{RI} ويحدد المعاملات.
+    \item \textbf{التنفيذ}: إن احتجنا معطاة من الذاكرة نقرؤها، ثم تحسب \textenglish{UAL} النتيجة.
+    \item \textbf{الكتابة}: نحفظ النتيجة في سجل أو في الذاكرة، ونحدّث الأعلام.
+\end{enumerate}
+
+\subsection{مثال كامل خطوة بخطوة}
+نأخذ آلة بسيطة بمركِّم \textenglish{ACC}، ونريد حساب \textenglish{z = x + y}. المتغير \textenglish{x}
+في العنوان 20، و\textenglish{y} في 21، و\textenglish{z} في 22.
+
+\begin{center}
+\begin{tabular}{|c|l|l|}
+    \hline
+    \ras{العنوان} & \ras{المحتوى} & \ras{المعنى} \\ \hline
+    10 & \code{LOAD 20}  & $\text{ACC} \leftarrow [20]$ \\ \hline
+    11 & \code{ADD 21}   & $\text{ACC} \leftarrow \text{ACC} + [21]$ \\ \hline
+    12 & \code{STORE 22} & $[22] \leftarrow \text{ACC}$ \\ \hline
+    20 & 7 & \textenglish{x} \\ \hline
+    21 & 5 & \textenglish{y} \\ \hline
+    22 & 0 & \textenglish{z} (قبل التنفيذ) \\ \hline
+\end{tabular}
+\end{center}
+
+نتابع التعليمة الثانية \code{ADD 21} خطوة بخطوة (في البداية \textenglish{CO = 11} و\textenglish{ACC = 7}):
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{1.6cm}|R|c|c|c|c|c|}
+    \hline
+    \ras{المرحلة} & \ras{ماذا يحدث؟} & \ras{\textenglish{CO}} & \ras{\textenglish{RAM}} & \ras{\textenglish{RIM}} & \ras{\textenglish{RI}} & \ras{\textenglish{ACC}} \\ \hline
+    الجلب & \nql{RAM}{CO} & 11 & \cell{orangeDeep}{11} & -- & -- & 7 \\ \cline{2-7}
+     & قراءة الذاكرة: \nql{RIM}{[11]} & 11 & 11 & \cell{orangeDeep}{\code{ADD 21}} & -- & 7 \\ \cline{2-7}
+     & \nql{RI}{RIM}، و\nql{CO}{CO + 1} & \cell{orangeDeep}{12} & 11 & \code{ADD 21} & \cell{orangeDeep}{\code{ADD 21}} & 7 \\ \hline
+    فك الترميز & المفكك يفهم: «جمع مع محتوى العنوان 21» & 12 & 11 & \code{ADD 21} & \code{ADD 21} & 7 \\ \hline
+    التنفيذ & \nql{RAM}{21}، ثم قراءة: \nql{RIM}{[21]} & 12 & \cell{orangeDeep}{21} & \cell{orangeDeep}{5} & \code{ADD 21} & 7 \\ \cline{2-7}
+     & \textenglish{UAL}: $7 + 5$ & 12 & 21 & 5 & \code{ADD 21} & 7 \\ \hline
+    الكتابة & \nql{ACC}{12}، وتحديث الأعلام & 12 & 21 & 5 & \code{ADD 21} & \cell{orangeDeep}{\textbf{12}} \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{khulasa}
+    بعد هذه التعليمة: \textenglish{ACC = 12} و\textenglish{CO = 12}، فالتعليمة القادمة هي \code{STORE 22}
+    التي تكتب 12 في الذاكرة، فتصبح \textenglish{z = 12}.
+\end{khulasa}
+
+\begin{hal}
+    المعالجات الحديثة لا تنتظر انتهاء تعليمة لتبدأ الأخرى: بينما تُنفَّذ تعليمة، تُفك ترميز
+    التي بعدها وتُجلب الثالثة. هذا هو \textbf{خط الأنابيب} \textenglish{(pipeline)} الذي سندرسه في الفصل الرابع.
+\end{hal}
+
+%================================================
+\section{تمارين}
+%================================================
+
+\begin{tamrin}
+    احسب بالمجمّع الكامل (بتًا بتًا) $1011 + 0110$ على 4 بتات. ما النتيجة وما قيمة \textenglish{CF}؟
+\end{tamrin}
+\begin{hall}
+    \begin{tabular}{|c|c|c|c|c|c|}
+        \hline \ras{البت} & \ras{$A$} & \ras{$B$} & \ras{$C_{in}$} & \ras{$S$} & \ras{$C_{out}$} \\ \hline
+        0 & 1 & 0 & 0 & 1 & 0 \\ \hline 1 & 1 & 1 & 0 & 0 & 1 \\ \hline
+        2 & 0 & 1 & 1 & 0 & 1 \\ \hline 3 & 1 & 0 & 1 & 0 & 1 \\ \hline
+    \end{tabular}\\
+    النتيجة $0001$ و\textenglish{CF = 1}: $11 + 6 = 17 = 16 + 1$، و«الـ16» ذهبت إلى \textenglish{CF}.
+\end{hall}
+
+\begin{tamrin}
+    على 8 بتات، أعط قيم \textenglish{AL} و\textenglish{CF} و\textenglish{ZF} بعد: (أ) $255 + 1$ (ب) $10 - 10$ (ج) $10 - 20$.
+\end{tamrin}
+\begin{hall}
+    (أ) $256 - 256 = 0$: \textenglish{AL = 0}، \textenglish{CF = 1}، \textenglish{ZF = 1}.\\
+    (ب) \textenglish{AL = 0}، \textenglish{CF = 0}، \textenglish{ZF = 1}.\\
+    (ج) $10 - 20 = -10$، وعلى 8 بتات $256 - 10 = 246 = \hex{F6}$: \textenglish{CF = 1} (استلاف)، \textenglish{ZF = 0}.
+\end{hall}
+
+\begin{tamrin}
+    حدد نمط العنونة في كل تعليمة: (أ) \code{mov al, [bx]} (ب) \code{mov al, 10h} (ج) \code{mov al, [10h]} (د) \code{mov al, bl}.
+\end{tamrin}
+\begin{hall}
+    (أ) غير مباشر بالسجل \quad (ب) فوري \quad (ج) مباشر \quad (د) سجلي.
+\end{hall}
+
+\begin{tamrin}
+    في المثال السابق (\textenglish{z = x + y})، اكتب جدول المراحل للتعليمة الثالثة \code{STORE 22}.
+\end{tamrin}
+\begin{hall}
+    \textbf{الجلب}: \nql{RAM}{12}، \nql{RIM}{STORE 22}، \nql{RI}{RIM}، \textenglish{CO = 13}.
+    \textbf{فك الترميز}: «اكتب \textenglish{ACC} في العنوان 22».
+    \textbf{التنفيذ والكتابة}: \nql{RAM}{22}، \nql{RIM}{ACC} (12)، ثم إشارة كتابة: $[22] = 12$.
+\end{hall}

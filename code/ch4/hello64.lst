@@ -1,0 +1,8 @@
+  401000:	48 c7 c0 01 00 00 00 	mov    rax,0x1
+  401007:	48 c7 c7 01 00 00 00 	mov    rdi,0x1
+  40100e:	48 c7 c6 00 20 40 00 	mov    rsi,0x402000
+  401015:	48 c7 c2 18 00 00 00 	mov    rdx,0x18
+  40101c:	0f 05                	syscall 
+  40101e:	48 c7 c0 3c 00 00 00 	mov    rax,0x3c
+  401025:	48 c7 c7 00 00 00 00 	mov    rdi,0x0
+  40102c:	0f 05                	syscall 

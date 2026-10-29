@@ -1,0 +1,9 @@
+ 100:	a0 18 01             	mov    al,ds:0x118
+ 103:	3a 06 19 01          	cmp    al,BYTE PTR ds:0x119
+ 107:	7f 06                	jg     0x10f
+ 109:	8d 16 26 01          	lea    dx,ds:0x126
+ 10d:	eb 04                	jmp    0x113
+ 10f:	8d 16 1a 01          	lea    dx,ds:0x11a
+ 113:	b4 09                	mov    ah,0x9
+ 115:	cd 21                	int    0x21
+ 117:	c3                   	ret    

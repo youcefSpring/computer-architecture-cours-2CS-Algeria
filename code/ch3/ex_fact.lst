@@ -1,0 +1,5 @@
+ 100:	b8 01 00             	mov    ax,0x1
+ 103:	b9 05 00             	mov    cx,0x5
+ 106:	f7 e1                	mul    cx
+ 108:	e2 fc                	loop   0x106
+ 10a:	c3                   	ret    

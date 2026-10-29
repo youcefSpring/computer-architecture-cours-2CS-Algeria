@@ -1,0 +1,4 @@
+ 100:	8d 16 09 01          	lea    dx,ds:0x109
+ 104:	b4 09                	mov    ah,0x9
+ 106:	cd 21                	int    0x21
+ 108:	c3                   	ret    

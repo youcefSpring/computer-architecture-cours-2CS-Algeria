@@ -1,0 +1,114 @@
+\documentclass[11pt, a4paper, oneside]{report}
+\input{style}
+
+\begin{document}
+
+%================================================
+% Cover
+%================================================
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+    \fill[brandTeal!12] (current page.north west) rectangle ([yshift=-8cm]current page.north east);
+    \draw[brandTeal, line width=1.5pt, opacity=0.35]
+        ([xshift=3cm, yshift=4cm]current page.south west) circle (6cm);
+    \draw[brandOrange, line width=1pt, opacity=0.35]
+        ([xshift=3cm, yshift=4cm]current page.south west) circle (7cm);
+    \begin{scope}[shift={([xshift=-2.6cm, yshift=-2.5cm]current page.north east)}, scale=0.62]
+        \fill[brandDark] (-1.5,-1.5) rectangle (1.5,1.5);
+        \fill[brandTeal] (-1,-1) rectangle (1,1);
+        \node[font=\codefont\bfseries\Large, text=white] at (0,0) {CPU};
+        \foreach \i in {-1.2,-0.6,0,0.6,1.2} {
+            \draw[brandMuted, line width=2pt] (\i,1.5) -- (\i,2);
+            \draw[brandMuted, line width=2pt] (\i,-1.5) -- (\i,-2);
+            \draw[brandMuted, line width=2pt] (1.5,\i) -- (2,\i);
+            \draw[brandMuted, line width=2pt] (-1.5,\i) -- (-2,\i);
+        }
+    \end{scope}
+\end{tikzpicture}
+
+\vspace*{1.2cm}
+\begin{flushleft}
+    {\sffamily\bfseries\color{tealDeep}\Large Course UEF31}\\[0.6cm]
+    {\sffamily\bfseries\color{brandDark}\fontsize{38}{46}\selectfont Computer Architecture}\\[0.4cm]
+    {\large\color{brandMuted}Architecture des ordinateurs}
+\end{flushleft}
+
+\vspace{4.5cm}
+\begin{tcolorbox}[enhanced, colback=white, colframe=brandTeal, arc=6pt, boxrule=1.2pt,
+    width=0.85\linewidth]
+    \large
+    \begin{itemize}
+        \item Chapter 1: General organization of the central unit
+        \item Chapter 2: Inside the processor
+        \item Chapter 3: Case study, the Intel 8086 processor
+        \item Chapter 4: Case study, 32-bit and 64-bit processors
+        \item Chapter 5: Modern processor architectures
+    \end{itemize}
+\end{tcolorbox}
+
+\vfill
+\begin{flushleft}
+    \begin{tabular}{@{}ll}
+        \textbf{Teacher:} & Dr. Benabderrezak Youcef \\
+        \textbf{Coefficient:} & 3 \quad\textbf{Credits:} 5 \\
+        \textbf{Assessment:} & exam 60\%, continuous assessment 40\% \\
+    \end{tabular}
+\end{flushleft}
+\end{titlepage}
+
+%================================================
+% How to use this course
+%================================================
+\chapter*{How to use this course}
+\addcontentsline{toc}{chapter}{How to use this course}
+\markboth{How to use this course}{}
+
+This course is written for you, even if this is the first time you look inside a computer.
+We start with simple ideas. Step by step, we go up to real programs in assembly language.
+At the end, we understand how the processors in our phones and laptops work.
+
+\section*{The coloured boxes}
+On every page you will find coloured boxes. Each colour has a job:
+
+\begin{tarif}
+    A new important word. We also give its French name, because you will meet it in the
+    official syllabus and in many books.
+\end{tarif}
+\begin{tashbih}
+    A difficult idea, explained with something you know from daily life: a kitchen, a school, a bus\dots
+\end{tashbih}
+\begin{khatwa}
+    A calculation or an execution, done one small step at a time. We never skip a step.
+\end{khatwa}
+\begin{intabih}
+    A common mistake, or a small detail that changes the result.
+\end{intabih}
+\begin{hal}
+    A fun extra fact. You do not need it for the exam, but it helps you understand.
+\end{hal}
+
+\section*{The programs in this course}
+\begin{itemize}
+    \item Every program is complete, and comes with a table \textbf{``What does each line do?''}.
+    \item The 8086 programs are written for the \textbf{EMU8086} emulator. The 64-bit programs are
+          written for \textbf{NASM} on \textbf{Linux}.
+    \item All the programs \textbf{were really run}. What you see in the black screen \faDesktop{} is the real output,
+          and the register tables come from the real execution.
+\end{itemize}
+
+\begin{intabih}
+    Do not only read! Copy each program into EMU8086, run it one instruction at a time
+    (the \emph{Single step} button), and watch the registers change. This is how you learn this course.
+\end{intabih}
+
+\tableofcontents
+
+\include{ch1}
+\include{ch2}
+\include{ch3}
+\include{ch4}
+\include{ch5}
+\include{appendix}
+
+\end{document}

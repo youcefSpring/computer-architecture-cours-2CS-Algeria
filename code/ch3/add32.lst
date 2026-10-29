@@ -1,0 +1,5 @@
+ 100:	b8 ff ff             	mov    ax,0xffff
+ 103:	ba 01 00             	mov    dx,0x1
+ 106:	83 c0 01             	add    ax,0x1
+ 109:	83 d2 00             	adc    dx,0x0
+ 10c:	c3                   	ret    

@@ -1,0 +1,487 @@
+\chapter{دراسة حالة: المعالجات ذات 32 و64 بتًا}
+
+\begin{khulasa}[: ماذا سنتعلم في هذا الفصل؟]
+\begin{itemize}
+    \item لماذا انتقلنا من 16 بتًا إلى 32 ثم 64 بتًا، وما الذي تغيّر.
+    \item تطور المعمارية من \textenglish{IA-32} إلى \textenglish{AMD64}.
+    \item سجلات المعالجات الحديثة، والعنونة المسطحة.
+    \item تعليمات جديدة: \textenglish{SSE} و\textenglish{AVX} التي تحسب عدة أعداد في وقت واحد.
+    \item خط الأنابيب: كيف ينفذ المعالج عدة تعليمات في الوقت نفسه.
+\end{itemize}
+\end{khulasa}
+
+\begin{intabih}
+    برامج هذا الفصل مكتوبة بصيغة \textbf{\textenglish{NASM}} لنظام \textbf{\textenglish{Linux}}، وقد نفذناها فعلًا على معالج
+    \textenglish{Intel Core i7-8665U} (4 أنوية). للتجميع والتنفيذ:
+    \code{nasm -f elf64 prog.asm} ثم \code{ld prog.o -o prog} ثم \code{./prog}.
+\end{intabih}
+
+%================================================
+\section{من 16 إلى 32 ثم 64 بتًا}
+%================================================
+
+\begin{tarif}
+    نقول إن المعالج من \textbf{$n$ بتًا} عندما تكون \textbf{سجلاته العامة} من $n$ بتًا: هذا هو حجم العدد الذي
+    يحسبه في تعليمة واحدة، وحجم العنوان الذي يستطيع وضعه في سجل.
+\end{tarif}
+
+\subsection{الفروق الأساسية}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.2cm}|C|C|C|}
+    \hline
+    \ras{} & \ras{16 بتًا (\textenglish{8086})} & \ras{32 بتًا (\textenglish{IA-32})} & \ras{64 بتًا (\textenglish{x86-64})} \\ \hline
+    أكبر عدد دون إشارة & $2^{16}-1 = 65\,535$ & $2^{32}-1 \approx 4.3$ مليار & $2^{64}-1 \approx 1.8 \times 10^{19}$ \\ \hline
+    الذاكرة القصوى & \textenglish{1 MB} (بالمقاطع) & \textenglish{4 GB} & \textenglish{256 TB} (48 بتًا عمليًا) \\ \hline
+    عدد السجلات العامة & 8 & 8 & \textbf{16} \\ \hline
+    أسماء السجلات & \textenglish{AX, BX, \dots} & \textenglish{EAX, EBX, \dots} & \textenglish{RAX, RBX, \dots, R15} \\ \hline
+    نمط العنونة & مقطعي & مسطح (عمليًا) & مسطح \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{لماذا نحتاج إلى أكثر من 32 بتًا؟}
+\begin{enumerate}
+    \item \textbf{الذاكرة}: بعنوان من 32 بتًا لا نستطيع استعمال أكثر من \textenglish{4 GB}. حواسيب اليوم فيها
+          \textenglish{16} أو \textenglish{32 GB}، والخوادم فيها مئات الغيغابايتات.
+    \item \textbf{الأداء}: سجل من 64 بتًا يحسب عددًا كبيرًا في تعليمة واحدة، بينما يحتاج معالج 32 بتًا إلى
+          تعليمتين على الأقل (كما رأينا \code{add} و\code{adc} في الفصل الثالث). ومضاعفة عدد السجلات (16 بدل 8)
+          تقلل الذهاب إلى الذاكرة.
+    \item \textbf{التوافق}: المعالج من 64 بتًا ينفذ أيضًا البرامج القديمة ذات 32 بتًا دون تغيير.
+\end{enumerate}
+
+\begin{khatwa}[: ما معنى «\textenglish{4 GB}» بالضبط؟]
+    \begin{enumerate}
+        \item عنوان من 32 بتًا يأخذ $2^{32}$ قيمة مختلفة.
+        \item $2^{32} = 2^{2} \times 2^{30} = 4 \times 2^{30}$.
+        \item و$2^{30}$ بايت $= 1$ \textenglish{GB}، إذن السعة القصوى $= 4$ \textenglish{GB}.
+    \end{enumerate}
+    بـ48 بتًا: $2^{48} = 2^{8} \times 2^{40} = 256$ \textenglish{TB}، أي أكبر بـ65536 مرة!
+\end{khatwa}
+
+%================================================
+\section{تطور المعمارية: من \textenglish{IA-32} إلى \textenglish{AMD64}}
+%================================================
+
+\begin{center}
+\begin{tikzpicture}[e/.style={unit=#1, minimum width=2.9cm, minimum height=1.3cm, font=\small}]
+    \node[e=brandMuted] (a) at (0,0) {\textenglish{8086} (1978)\\16 بتًا، مقاطع};
+    \node[e=brandPurple] (b) at (-3.6,0) {\textenglish{80286} (1982)\\النمط المحمي};
+    \node[e=brandTeal] (c) at (-7.2,0) {\textenglish{80386} (1985)\\\textbf{\textenglish{IA-32}}};
+    \node[e=brandOrange] (d) at (-10.8,0) {\textenglish{AMD64} (2003)\\\textbf{64 بتًا}};
+    \draw[sahmT] (a) -- (b); \draw[sahmT] (b) -- (c); \draw[sahmT] (c) -- (d);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{\textenglish{IA-32}} \textenglish{(Intel Architecture 32 bits)}: بدأت مع \textenglish{80386}. السجلات أصبحت من 32 بتًا
+          (\textenglish{EAX}، الحرف \textenglish{E} يعني \textenglish{Extended})، وظهر \textbf{النمط المحمي} الذي يمنع البرامج من
+          الكتابة في ذاكرة بعضها البعض.
+    \item \textbf{\textenglish{AMD64}}: المفاجأة أن شركة \textenglish{AMD} (وليس \textenglish{Intel}) هي التي صممت الامتداد إلى 64 بتًا سنة 2003،
+          مع المحافظة على التوافق. تبنّته \textenglish{Intel} بعد ذلك باسم \textenglish{Intel 64}. نسميه اليوم \textenglish{x86-64}.
+\end{itemize}
+
+\subsection{أنماط عمل المعالج}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.3cm}|R|R|}
+    \hline
+    \ras{النمط} & \ras{الوصف} & \ras{متى؟} \\ \hline
+    الحقيقي \textenglish{(real mode)} & يتصرف كمعالج \textenglish{8086}: 16 بتًا و\textenglish{1 MB} & عند تشغيل الحاسوب، قبل نظام التشغيل \\ \hline
+    المحمي \textenglish{(protected mode)} & 32 بتًا، حماية الذاكرة & أنظمة 32 بتًا \\ \hline
+    الطويل \textenglish{(long mode)} & 64 بتًا، ومعه نمط فرعي للتوافق مع برامج 32 بتًا & كل الأنظمة الحديثة \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{hal}
+    كل حاسوب حديث يستيقظ وهو «يعتقد» أنه \textenglish{8086}! يبدأ في النمط الحقيقي، ثم ينقله نظام التشغيل إلى
+    النمط المحمي ثم الطويل. هكذا تبقى المعمارية متوافقة منذ 1978.
+\end{hal}
+
+%================================================
+\section{السجلات في معالجات 32 و64 بتًا}
+%================================================
+
+\subsection{السجلات المتداخلة}
+كل سجل جديد \textbf{يحتوي} السجل القديم في نصفه الأيمن (البتات الصغيرة):
+
+\begin{center}
+\begin{tikzpicture}[b/.style={draw=brandDark, thick, minimum height=0.75cm, font=\codefont\bfseries}]
+    \node[b, minimum width=12cm, fill=brandOrange!15, anchor=east] (r) at (6,1.6) {\textenglish{RAX: 64 bits}};
+    \node[b, minimum width=6cm, fill=brandTeal!15, anchor=east] (e) at (6,0.8) {\textenglish{EAX: 32 bits}};
+    \node[b, minimum width=3cm, fill=brandGreen!20, anchor=east] (x) at (6,0) {\textenglish{AX: 16}};
+    \node[b, minimum width=1.5cm, fill=brandPurple!20, anchor=east] (h) at (4.5,-0.8) {\textenglish{AH}};
+    \node[b, minimum width=1.5cm, fill=brandPurple!35, anchor=east] (l) at (6,-0.8) {\textenglish{AL}};
+    \foreach \x/\t in {6/0, 4.5/8, 3/16, 0/32, -6/64} \node[font=\codefont\scriptsize] at (\x,-1.45) {\textenglish{\t}};
+    \draw[brandMuted, dashed] (0,-1.25) -- (0,1.2); \draw[brandMuted, dashed] (3,-1.25) -- (3,0.4);
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|l|}
+    \hline
+    \ras{64 بتًا} & \ras{32 بتًا} & \ras{16 بتًا} & \ras{8 بتات} & \ras{الاستعمال المعتاد} \\ \hline
+    \textenglish{RAX} & \textenglish{EAX} & \textenglish{AX} & \textenglish{AL} & النتيجة المعادة من دالة \\ \hline
+    \textenglish{RBX} & \textenglish{EBX} & \textenglish{BX} & \textenglish{BL} & عام \\ \hline
+    \textenglish{RCX} & \textenglish{ECX} & \textenglish{CX} & \textenglish{CL} & العدّاد، المعامل الرابع \\ \hline
+    \textenglish{RDX} & \textenglish{EDX} & \textenglish{DX} & \textenglish{DL} & المعامل الثالث \\ \hline
+    \textenglish{RSI} & \textenglish{ESI} & \textenglish{SI} & \textenglish{SIL} & المعامل الثاني \\ \hline
+    \textenglish{RDI} & \textenglish{EDI} & \textenglish{DI} & \textenglish{DIL} & المعامل الأول \\ \hline
+    \textenglish{RSP} & \textenglish{ESP} & \textenglish{SP} & \textenglish{SPL} & قمة المكدس \\ \hline
+    \textenglish{RBP} & \textenglish{EBP} & \textenglish{BP} & \textenglish{BPL} & قاعدة إطار المكدس \\ \hline
+    \textenglish{R8 \dots R15} & \textenglish{R8D \dots R15D} & \textenglish{R8W \dots} & \textenglish{R8B \dots} & \textbf{جديدة في 64 بتًا} \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{\textenglish{RIP}}: مؤشر التعليمة (كان \textenglish{IP} ثم \textenglish{EIP}).
+    \item \textbf{\textenglish{RFLAGS}}: سجل الأعلام، والأعلام \textenglish{ZF}، \textenglish{CF}، \textenglish{SF}، \textenglish{OF} في المكان نفسه كما في \textenglish{8086}.
+    \item \textbf{سجلات المقاطع}: ما زالت موجودة (\textenglish{CS}، \textenglish{DS}\dots) لكن بدايتها كلها 0 في 64 بتًا، ما عدا
+          \textenglish{FS} و\textenglish{GS} التي يستعملها النظام لمعطيات خاصة بكل خيط تنفيذ.
+\end{itemize}
+
+\subsection{تجربة: ماذا يحدث للبتات الأخرى؟}
+\asm{ch4/regs64.asm}
+\screen{ch4/regs64.out}
+
+\begin{sharh}
+    \s{5--6}{نضع عددًا من 64 بتًا في \textenglish{RAX} ونعرضه: \textenglish{1122334455667788}.}
+    \s{9}{الكتابة في \textenglish{EAX} (32 بتًا) \textbf{تصفّر} النصف الأعلى: \textenglish{00000000AABBCCDD}.}
+    \s{13}{الكتابة في \textenglish{AX} (16 بتًا) تترك باقي البتات كما هي: \textenglish{\dots 5566}\textbf{\textenglish{1234}}.}
+    \s{17}{الكتابة في \textenglish{AL} تغيّر البايت الأخير فقط: \textenglish{\dots 77}\textbf{\textenglish{FF}}.}
+    \s{24--42}{إجراء يعرض \textenglish{RAX} بالست عشري: في كل دورة يدوّر 4 بتات، يأخذها بالقناع \code{0xF}، ويحوّلها إلى حرف.}
+\end{sharh}
+
+\begin{intabih}
+    هذه قاعدة غريبة لكنها مهمة: في 64 بتًا، \textbf{كل كتابة في سجل من 32 بتًا تصفّر البتات العليا}، أما الكتابة
+    في 8 أو 16 بتًا فلا تفعل ذلك. صممت \textenglish{AMD} هذه القاعدة لتسريع المعالج.
+\end{intabih}
+
+%================================================
+\section{أنماط العنونة المتقدمة}
+%================================================
+
+\subsection{من العنونة المقطعية إلى العنونة المسطحة}
+\begin{center}
+\begin{tikzpicture}
+    \draw[thick, fill=brandLight] (0,0) rectangle (2,-4);
+    \foreach \y/\c in {0/brandTeal, -1.3/brandOrange, -2.6/brandGreen} \fill[\c!30] (0,\y) rectangle (2,\y-1.2);
+    \foreach \y/\t in {-0.6/\textenglish{CS}, -1.9/\textenglish{DS}, -3.2/\textenglish{SS}} \node[font=\codefont] at (1,\y) {\t};
+    \node[font=\small\bfseries, align=center] at (1,0.6) {مقطعي \textenglish{(8086)}};
+    \node[font=\scriptsize, text width=4cm, align=center] at (1,-4.6) {مناطق من \textenglish{64 KB}، والعنوان = مقطع:إزاحة};
+    \draw[thick, fill=brandTeal!15] (-6,0) rectangle (-4,-4);
+    \node[font=\small, align=center] at (-5,-2) {مساحة واحدة\\متصلة};
+    \node[font=\small\bfseries, align=center] at (-5,0.6) {مسطح \textenglish{(x86-64)}};
+    \node[font=\scriptsize, text width=4cm, align=center] at (-5,-4.6) {العنوان = عدد واحد من 0 إلى النهاية};
+    \draw[sahmO] (-0.4,-2) -- (-3.6,-2);
+\end{tikzpicture}
+\end{center}
+
+في \mustalah{النموذج المسطح}{Modèle mémoire plat}{Flat memory model} يرى البرنامج الذاكرة \textbf{كشريط واحد طويل} من
+البايتات، مرقمة من 0. لا نحتاج إلى حساب «مقطع × 16 + إزاحة»: العنوان هو مجرد عدد في سجل من 64 بتًا.
+
+\begin{tashbih}
+    العنونة المقطعية تشبه أن تقول: «العمارة 12، الطابق 3». العنونة المسطحة تشبه أن تعطي لكل شقة في المدينة
+    رقمًا واحدًا فريدًا: «الشقة رقم 73\,502». أبسط بكثير، بشرط أن نملك أعدادًا كبيرة بما يكفي.
+\end{tashbih}
+
+\subsection{الشكل العام للعنوان}
+\begin{tarif}
+    \centering
+    $\text{العنوان} = \text{القاعدة} + \text{الفهرس} \times \text{السلّم} + \text{الإزاحة}$
+    \par\small
+    القاعدة والفهرس: أي سجلين. السلّم: 1 أو 2 أو 4 أو 8. الإزاحة: عدد ثابت.
+\end{tarif}
+
+\begin{center}
+\small
+\begin{tabular}{|l|l|}
+    \hline
+    \ras{الكتابة (\textenglish{NASM})} & \ras{الاستعمال} \\ \hline
+    \code{[rbx]} & القاعدة فقط: مؤشر \\ \hline
+    \code{[rbx + 16]} & قاعدة + إزاحة: حقل في هيكل \textenglish{(struct)} \\ \hline
+    \code{[tab + rcx*8]} & فهرس × سلّم + إزاحة: العنصر \textenglish{i} من جدول أعداد من 8 بايتات \\ \hline
+    \code{[rbx + rcx*4 + 8]} & كل العناصر معًا \\ \hline
+    \code{[rel msg]} & نسبي إلى \textenglish{RIP}: خاص بـ64 بتًا \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: أين يقرأ \code{[tab + rcx*8]} عندما \textenglish{RCX = 3}؟]
+    \begin{enumerate}
+        \item كل عنصر من \code{tab} عدد من 64 بتًا = 8 بايتات (\code{dq}).
+        \item العنصر رقم 3 (الرابع، لأننا نبدأ من 0) على بعد $3 \times 8 = 24$ بايتًا من البداية.
+        \item إذا كان \code{tab} في العنوان \hex{402000}، فالعنوان هو $\hex{402000} + 24 = \hex{402018}$.
+    \end{enumerate}
+    السلّم يُغنينا عن ضرب الفهرس بأنفسنا: المعالج يفعل ذلك داخل التعليمة نفسها.
+\end{khatwa}
+
+\asm{ch4/sum64.asm}
+\screen{ch4/sum64.out}
+
+\begin{sharh}
+    \s{5--6}{\code{xor} سجل مع نفسه = 0: المجموع والفهرس يبدآن من 0.}
+    \s{8}{العنونة \textbf{بالسلّم}: نقرأ العنصر \textenglish{i} من الجدول، ونجمعه في \textenglish{RAX}.}
+    \s{9--11}{\code{i++} ثم «طالما \textenglish{i < 5}» نعود. هذه حلقة \code{while} كما رأينا في الفصل الثالث.}
+    \s{18--36}{نفس طريقة الفصل الثالث لعرض عدد بالعشري (القسمة على 10)، لكن بسجلات 64 بتًا.}
+    \s{39}{\code{dq} \textenglish{(define quad-word)}: أعداد من 64 بتًا. العدد الأول ($10^{12}$) لا يدخل في 32 بتًا.}
+\end{sharh}
+
+\subsection{العنونة النسبية إلى \textenglish{RIP}}
+في 64 بتًا نكتب كثيرًا \code{lea rsi, [rel buf]}: العنوان يُحسب \textbf{بالنسبة إلى التعليمة الحالية}
+($\text{RIP} + \text{مسافة}$). الفائدة: يعمل البرنامج في أي مكان يضعه فيه النظام في الذاكرة، وهذا مهم للأمان
+(النظام يغيّر مكان البرامج في كل تشغيل لكي يصعب على المهاجمين معرفة العناوين).
+
+%================================================
+\section{مجموعة التعليمات}
+%================================================
+
+\subsection{التعليمة نفسها على 16 و32 و64 بتًا}
+جمّعنا البرنامج الآتي، وهذه بايتات لغة الآلة الحقيقية:
+
+\asm{ch4/same.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|l|l|l|}
+    \hline
+    \ras{التعليمة} & \ras{لغة الآلة} & \ras{الملاحظة} \\ \hline
+    \code{add ax, bx} & \textenglish{\codefont \textcolor{orangeDeep}{66} 01 D8} & البادئة \textenglish{66}: «انتبه، 16 بتًا» \\ \hline
+    \code{add eax, ebx} & \textenglish{\codefont 01 D8} & 32 بتًا هو الحجم الافتراضي \\ \hline
+    \code{add rax, rbx} & \textenglish{\codefont \textcolor{orangeDeep}{48} 01 D8} & البادئة \textenglish{REX.W = 48}: «64 بتًا» \\ \hline
+    \code{add r8, r9} & \textenglish{\codefont \textcolor{orangeDeep}{4D} 01 C8} & \textenglish{REX = 4D}: 64 بتًا + سجلات جديدة \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: لماذا \textenglish{01 D8} موجودة في الأسطر الثلاثة الأولى؟]
+    \begin{enumerate}
+        \item \textenglish{01} هو الرمز العملي «جمع سجل في سجل أو ذاكرة»، وهو نفسه منذ \textenglish{8086}.
+        \item \textenglish{D8} = \bin{11\,011\,000} هو بايت \textenglish{ModR/M} الذي رأيناه في الفصل الثالث: \textenglish{mod = 11} (سجل)،
+              \textenglish{reg = 011} (\textenglish{BX})، \textenglish{r/m = 000} (\textenglish{AX}).
+        \item الحجم (16 أو 32 أو 64) لا يُكتب في التعليمة نفسها، بل في \textbf{بادئة} قبلها. هكذا بقيت التعليمات القديمة
+              صالحة، وأضيفت الأحجام الجديدة «من الخارج».
+        \item في \textenglish{4D} = \bin{0100\,1101}: \textenglish{0100} تعني «بادئة \textenglish{REX}»، ثم بت \textenglish{W = 1} (64 بتًا)، وبتّان
+              يضيفان 8 إلى رقم السجلين، فيصبح \textenglish{AX} هو \textenglish{R8} و\textenglish{BX} هو \textenglish{R9}.
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{مقارنة: برنامج 32 بتًا وبرنامج 64 بتًا}
+\textbf{بـ32 بتًا:}
+\asm{ch4/hello32.asm}
+\screen{ch4/hello32.out}
+\textbf{بـ64 بتًا:}
+\asm{ch4/hello64.asm}
+\screen{ch4/hello64.out}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.6cm}|C|C|}
+    \hline
+    \ras{} & \ras{32 بتًا} & \ras{64 بتًا} \\ \hline
+    طلب خدمة من النظام & \code{int 0x80} (مقاطعة) & \code{syscall} (تعليمة خاصة، أسرع) \\ \hline
+    رقم الخدمة \textenglish{write} & 4 في \textenglish{EAX} & 1 في \textenglish{RAX} \\ \hline
+    المعاملات & \textenglish{EBX}، \textenglish{ECX}، \textenglish{EDX} & \textenglish{RDI}، \textenglish{RSI}، \textenglish{RDX} \\ \hline
+    حجم العنوان & 4 بايتات & 8 بايتات \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{hal}
+    نفذنا البرنامجين على الحاسوب نفسه ذي 64 بتًا. البرنامج ذو 32 بتًا عمل دون أي تعديل: هذا هو النمط الفرعي
+    للتوافق داخل النمط الطويل.
+\end{hal}
+
+\subsection{ماذا يكتب المترجم؟ من \textenglish{C} إلى لغة التجميع}
+كتبنا دالة بلغة \textenglish{C}، وطلبنا من المترجم \textenglish{gcc} أن يعطينا لغة التجميع التي يولّدها
+(\code{gcc -O1 -S -masm=intel sum.c}):
+
+\begin{center}
+\begin{minipage}[t]{0.47\linewidth}
+    \cfile{ch4/sum.c}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\linewidth}
+    \asm{ch4/sum_gcc.s}
+\end{minipage}
+\end{center}
+
+\begin{sharh}
+    \s{1}{حسب قواعد \textenglish{Linux} لـ64 بتًا: المعامل الأول (\code{t}) يصل في \textenglish{RDI}، والثاني (\code{n}) في \textenglish{RSI}.}
+    \s{2--3}{إذا كان $n \leq 0$ نقفز إلى \code{.L4}: النتيجة 0.}
+    \s{5}{\code{lea}: يحسب عنوان نهاية الجدول $t + n \times 8$ \textbf{دون أن يقرأ الذاكرة}.}
+    \s{8--11}{الحلقة: نجمع العنصر، نتقدم بـ8 بايتات، ونتوقف عند النهاية. المترجم استعمل مؤشرًا بدل الفهرس \code{i}.}
+    \s{13--14}{النتيجة تُعاد دائمًا في \textenglish{RAX}.}
+\end{sharh}
+
+\subsection{\textenglish{SSE} و\textenglish{AVX}: حساب عدة أعداد مرة واحدة}
+\begin{tarif}
+    \mustalah{\textenglish{SIMD}}{Une instruction, données multiples}{Single Instruction, Multiple Data}: تعليمة واحدة تطبق
+    العملية نفسها على \textbf{عدة أعداد في الوقت نفسه}.
+\end{tarif}
+
+\begin{center}
+\begin{tikzpicture}[c/.style={draw=brandDark, thick, minimum width=1.3cm, minimum height=0.65cm, font=\codefont}]
+    \foreach \v [count=\i from 0] in {1.5, 2.5, 3.5, 4.5} \node[c, fill=brandTeal!15] at (-1.3*\i,1.6) {\textenglish{\v}};
+    \foreach \v [count=\i from 0] in {10, 20, 30, 40} \node[c, fill=brandOrange!15] at (-1.3*\i,0.6) {\textenglish{\v}};
+    \foreach \v [count=\i from 0] in {11.5, 22.5, 33.5, 44.5} \node[c, fill=brandGreen!20] at (-1.3*\i,-0.9) {\textenglish{\v}};
+    \draw[very thick] (-4.6,0.1) -- (0.7,0.1);
+    \node[font=\codefont\bfseries] at (1.4,0.6) {\textenglish{+}};
+    \node[font=\small, anchor=west] at (1.2,1.6) {\textenglish{XMM0} (128 بتًا = 4 أعداد)};
+    \node[font=\small, anchor=west] at (1.2,-0.9) {النتيجة: \textbf{تعليمة واحدة} \code{addps}};
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|c|}
+    \hline
+    \ras{الامتداد} & \ras{السنة} & \ras{السجلات} & \ras{الحجم} & \ras{أعداد \textenglish{float} في المرة} \\ \hline
+    \textenglish{SSE} & 1999 & \textenglish{XMM0--XMM15} & 128 بتًا & 4 \\ \hline
+    \textenglish{AVX} & 2011 & \textenglish{YMM0--YMM15} & 256 بتًا & 8 \\ \hline
+    \textenglish{AVX-512} & 2016 & \textenglish{ZMM0--ZMM31} & 512 بتًا & 16 \\ \hline
+\end{tabular}
+\end{center}
+
+\cfile{ch4/simd.c}
+\screen{ch4/simd.out}
+
+عندما نفتح البرنامج المترجم، نجد فعلًا التعليمة الحقيقية:
+\begin{codebox}\begin{english}\codefont\small
+    addps \ xmm0, XMMWORD PTR [rbp-0x50] \quad \textcolor{red!75!black}{; 4 additions at once}
+\end{english}\end{codebox}
+
+ونسخة \textenglish{AVX} تجمع 8 أعداد بالتعليمة \code{vaddps ymm0, ymm0, [\dots]}:
+\cfile{ch4/avx.c}
+\screen{ch4/avx.out}
+
+\begin{tashbih}
+    التعليمة العادية تشبه أستاذًا يصحح ورقة امتحان واحدة في كل مرة. \textenglish{SIMD} تشبه أستاذًا يضع 8 أوراق جنبًا
+    إلى جنب، ويصحح السؤال الأول فيها كلها بحركة واحدة. لهذا تُستعمل في معالجة الصور، الفيديو، الألعاب، والذكاء الاصطناعي،
+    حيث نطبق العملية نفسها على ملايين الأعداد.
+\end{tashbih}
+
+%================================================
+\section{دورة تنفيذ التعليمة وخط الأنابيب}
+%================================================
+
+\subsection{المراحل الخمس}
+في المعالجات الحديثة، تنقسم كل تعليمة إلى مراحل، ولكل مرحلة دارة خاصة بها:
+\begin{center}
+\small
+\begin{tabular}{|c|c|l|}
+    \hline
+    \ras{المرحلة} & \ras{الاسم} & \ras{العمل} \\ \hline
+    \textenglish{IF} & الجلب & قراءة التعليمة من الذاكرة (بعنوان \textenglish{RIP}) \\ \hline
+    \textenglish{ID} & فك الترميز & فهم التعليمة وقراءة السجلات \\ \hline
+    \textenglish{EX} & التنفيذ & حساب النتيجة في \textenglish{UAL} أو حساب العنوان \\ \hline
+    \textenglish{MEM} & الذاكرة & القراءة أو الكتابة في الذاكرة إن احتجنا \\ \hline
+    \textenglish{WB} & الكتابة & حفظ النتيجة في السجل \\ \hline
+\end{tabular}
+\end{center}
+
+\subsection{دون خط أنابيب ومع خط أنابيب}
+\begin{tashbih}
+    في مغسلة ملابس: الغسل ساعة، التجفيف ساعة، الكي ساعة. لغسل 3 أكياس واحدًا بعد الآخر نحتاج 9 ساعات.
+    لكن عندما يخرج الكيس الأول من الغسالة إلى المجفف، نضع الكيس الثاني في الغسالة فورًا. الآلات الثلاث تعمل
+    معًا، فننتهي في 5 ساعات فقط. هذا هو خط الأنابيب.
+\end{tashbih}
+
+\begin{center}
+\begin{tikzpicture}[s/.style={draw=brandDark, minimum width=0.95cm, minimum height=0.55cm, font=\codefont\scriptsize\bfseries}]
+    \node[font=\small\bfseries] at (-0.6,0.9) {مع خط الأنابيب: 4 تعليمات في 8 دورات};
+    \foreach \c in {1,...,8} \node[font=\codefont\scriptsize] at (-0.95*\c+0.95*0.5-0.95*0, 0.35) {\textenglish{\c}};
+    \foreach \i/\col in {1/brandTeal, 2/brandOrange, 3/brandGreen, 4/brandPurple} {
+        \node[font=\small] at (0.9,-0.6*\i+0.1) {\textenglish{I\i}};
+        \foreach \st [count=\k from 0] in {IF, ID, EX, MEM, WB} {
+            \pgfmathsetmacro\x{-0.95*(\i+\k)+0.475}
+            \node[s, fill=\col!25] at (\x, -0.6*\i+0.1) {\textenglish{\st}};
+        }
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{tarif}
+    لـ$n$ تعليمة و$k$ مرحلة (كل مرحلة دورة واحدة):
+    \begin{itemize}
+        \item دون خط أنابيب: $n \times k$ دورة.
+        \item مع خط أنابيب: $k + (n - 1)$ دورة: الأولى تحتاج $k$ دورات، ثم تنتهي تعليمة في \textbf{كل} دورة.
+    \end{itemize}
+\end{tarif}
+
+\begin{khatwa}[: 100 تعليمة في خط أنابيب من 5 مراحل]
+    \begin{enumerate}
+        \item دون خط أنابيب: $100 \times 5 = 500$ دورة.
+        \item مع خط أنابيب: $5 + (100 - 1) = 104$ دورات.
+        \item التسريع: $\dfrac{500}{104} \approx 4.8$ مرات، أي قريب من عدد المراحل (5).
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{المخاطر: متى يتوقف خط الأنابيب؟}
+\begin{enumerate}
+    \item \textbf{خطر المعطيات}: \code{add rax, rbx} ثم \code{add rcx, rax}. التعليمة الثانية تحتاج \textenglish{RAX} الجديد،
+          لكن الأولى لم تكتبه بعد. الحل: المعالج «يمرر» النتيجة مباشرة من \textenglish{EX} إلى التعليمة الثانية، أو ينتظر دورة.
+    \item \textbf{خطر التحكم}: بعد \code{jmp} أو \code{jne}، التعليمات التي جُلبت بعدها قد تكون خاطئة. الحل:
+          \mustalah{التنبؤ بالقفز}{Prédiction de branchement}{Branch prediction}: المعالج يخمّن هل سيقفز، وإن أخطأ
+          يرمي التعليمات الخاطئة ويبدأ من جديد.
+    \item \textbf{خطر البنية}: تعليمتان تحتاجان الدارة نفسها في الدورة نفسها (مثل الذاكرة).
+\end{enumerate}
+
+\subsection{مثال: \code{mov} و\code{add} و\code{jmp} في 64 بتًا}
+نتابع ثلاث تعليمات من البرنامج \code{same.asm} وبرامج هذا الفصل، ببايتاتها الحقيقية:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{1.1cm}|>{\centering\arraybackslash}p{2.7cm}|R|R|}
+    \hline
+    \ras{المرحلة} & \ras{\code{mov rax, 60}} & \ras{\code{add rax, rbx}} & \ras{\code{jmp fin}} \\ \hline
+    \textenglish{IF} & جلب 7 بايتات \textenglish{48 C7 C0 3C 00 00 00} & جلب 3 بايتات \textenglish{48 01 D8} & جلب بايتين \textenglish{EB 00} \\ \hline
+    \textenglish{ID} & \textenglish{REX.W}: 64 بتًا، الوجهة \textenglish{RAX}، والقيمة 60 داخل التعليمة & 64 بتًا، المصدر \textenglish{RBX}، الوجهة \textenglish{RAX}، وقراءة السجلين & قفز قصير، الإزاحة 0 \\ \hline
+    \textenglish{EX} & لا حساب (القيمة جاهزة) & \textenglish{UAL}: $\text{RAX} + \text{RBX}$ وحساب الأعلام & حساب الهدف: $\text{RIP} + 0$ \\ \hline
+    \textenglish{MEM} & لا شيء & لا شيء & لا شيء \\ \hline
+    \textenglish{WB} & \nql{RAX}{60} & \textenglish{RAX} يأخذ النتيجة، وتحديث \textenglish{RFLAGS} & \textenglish{RIP} يأخذ الهدف، ورمي ما جُلب خطأً \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{hal}
+    معالج \textenglish{Core i7} الذي جربنا عليه لا يكتفي بخط أنابيب من 5 مراحل: فيه أكثر من 14 مرحلة،
+    ويستطيع إطلاق \textbf{4 تعليمات في كل دورة}، بل وينفذها \textbf{بغير ترتيبها} إذا كانت مستقلة عن بعضها،
+    ثم يرتب النتائج. كل هذا يحدث دون أن يرى المبرمج أي فرق.
+\end{hal}
+
+%================================================
+\section{تمارين}
+%================================================
+
+\begin{tamrin}
+    كم بايتًا يستطيع معالج أن يعنون بعنوان من 36 بتًا؟ (هذا ما سمح به الامتداد \textenglish{PAE} في معالجات 32 بتًا).
+\end{tamrin}
+\begin{hall}
+    $2^{36} = 2^{6} \times 2^{30} = 64$ \textenglish{GB}.
+\end{hall}
+
+\begin{tamrin}
+    \textenglish{RAX = \hex{FFFFFFFFFFFFFFFF}}. ما قيمة \textenglish{RAX} بعد: (أ) \code{mov eax, 1} (ب) \code{mov ax, 1} (ج) \code{mov al, 1}؟
+\end{tamrin}
+\begin{hall}
+    (أ) \hex{0000000000000001} (الكتابة في 32 بتًا تصفّر النصف الأعلى).\\
+    (ب) \hex{FFFFFFFFFFFF0001}. \quad (ج) \hex{FFFFFFFFFFFFFF01}.
+\end{hall}
+
+\begin{tamrin}
+    جدول من أعداد \textenglish{int} (4 بايتات) يبدأ في \hex{601000}. ما عنوان العنصر رقم 10؟ واكتب العنونة بصيغة \textenglish{NASM}.
+\end{tamrin}
+\begin{hall}
+    $\hex{601000} + 10 \times 4 = \hex{601000} + 40 = \hex{601028}$. الصيغة: \code{[tab + rcx*4]} مع \textenglish{RCX = 10}.
+\end{hall}
+
+\begin{tamrin}
+    خط أنابيب من 6 مراحل، و1000 تعليمة. احسب عدد الدورات دون خط أنابيب ومعه، والتسريع.
+\end{tamrin}
+\begin{hall}
+    دون: $1000 \times 6 = 6000$. مع: $6 + 999 = 1005$. التسريع $= \dfrac{6000}{1005} \approx 5.97$.
+\end{hall}
+
+\begin{tamrin}
+    في البرنامج الآتي، أين يوجد خطر المعطيات؟ \code{mov rax, [x]} ثم \code{add rax, 5} ثم \code{mov [y], rax}.
+\end{tamrin}
+\begin{hall}
+    الثانية تحتاج \textenglish{RAX} الذي تقرؤه الأولى من الذاكرة، والثالثة تحتاج \textenglish{RAX} الذي تحسبه الثانية: كل
+    تعليمة تعتمد على التي قبلها مباشرة.
+\end{hall}

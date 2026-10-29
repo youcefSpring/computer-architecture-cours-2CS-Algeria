@@ -1,0 +1,421 @@
+\chapter{بنية المعالجات الحديثة}
+
+\begin{khulasa}[: ماذا سنتعلم في هذا الفصل؟]
+\begin{itemize}
+    \item كيف تطورت المعالجات، ولماذا توقف ارتفاع التردد.
+    \item المعالجات متعددة الأنوية والمعالجة المتوازية: الفوائد والصعوبات، وقانون \textenglish{Amdahl}.
+    \item الذاكرة المخبئية وتسلسل الذاكرة، ولماذا يكون ترتيب قراءة المعطيات مهمًا جدًا.
+\end{itemize}
+\end{khulasa}
+
+\begin{intabih}
+    كل الأرقام في هذا الفصل \textbf{قسناها فعلًا} على حاسوب محمول بمعالج \textenglish{Intel Core i7-8665U}
+    (4 أنوية، 8 خيوط، ذاكرة مخبئية \textenglish{L1 = 32 KB} و\textenglish{L2 = 256 KB} لكل نواة، و\textenglish{L3 = 8 MB} مشتركة).
+    إذا أعدت التجارب على حاسوبك ستحصل على أرقام مختلفة قليلًا، لكن الظواهر نفسها.
+\end{intabih}
+
+%================================================
+\section{المعالجات الحديثة: الاتجاهات والتطور}
+%================================================
+
+\subsection{خمسون سنة من التقدم}
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|c|}
+    \hline
+    \ras{المعالج} & \ras{السنة} & \ras{الترانزستورات} & \ras{التردد} & \ras{الأنوية} \\ \hline
+    \textenglish{Intel 4004} & 1971 & \textenglish{2\,300} & \textenglish{0.74 MHz} & 1 \\ \hline
+    \textenglish{Intel 8086} & 1978 & \textenglish{29\,000} & \textenglish{5--10 MHz} & 1 \\ \hline
+    \textenglish{Intel 80386} & 1985 & \textenglish{275\,000} & \textenglish{16--33 MHz} & 1 \\ \hline
+    \textenglish{Pentium 4} & 2000 & 42 مليون & \textenglish{1.3--3.8 GHz} & 1 \\ \hline
+    \textenglish{Core i7-8665U} & 2019 & حوالي ملياري & \textenglish{1.9--4.8 GHz} & 4 \\ \hline
+    معالجات 2024 & 2024 & عشرات المليارات & حوالي \textenglish{5 GHz} & من 8 إلى أكثر من 100 \\ \hline
+\end{tabular}
+\end{center}
+
+\subsection{جدار التردد}
+حتى سنة 2004 تقريبًا، كانت كل سنة تأتي بمعالج أسرع لأن \textbf{التردد} يرتفع. ثم توقف التردد عند حوالي
+\textenglish{4} إلى \textenglish{5 GHz}. السبب الرئيسي هو \textbf{الحرارة}:
+\begin{itemize}
+    \item كل نبضة ساعة تستهلك طاقة. كلما ارتفع التردد ارتفعت الطاقة المستهلكة، والطاقة تتحول إلى حرارة.
+    \item عند \textenglish{4 GHz} تقريبًا يسخن المعالج إلى درجة لا نستطيع تبريدها في حاسوب عادي.
+\end{itemize}
+
+\begin{tashbih}
+    عدّاء يركض أسرع وأسرع، حتى يصل إلى سرعة لا يستطيع أن يحافظ عليها دون أن ينهار. بدل أن نطلب منه
+    الركض أسرع، نضيف عدّائين آخرين يتقاسمون معه المسافة. هذا بالضبط ما فعله صانعو المعالجات.
+\end{tashbih}
+
+\subsection{الاتجاهات الحالية}
+\begin{enumerate}
+    \item \textbf{أنوية أكثر} بدل تردد أعلى (القسم الآتي).
+    \item \textbf{ذاكرة مخبئية أكبر وأذكى}، لأن الذاكرة أصبحت أبطأ بكثير من المعالج (القسم الأخير).
+    \item \textbf{تعليمات متخصصة}: \textenglish{SIMD} (الفصل الرابع)، وتسريع الذكاء الاصطناعي والتشفير.
+    \item \textbf{أنوية مختلفة في الشريحة نفسها}: أنوية قوية للعمل الثقيل وأنوية اقتصادية للعمل الخفيف، لتوفير البطارية.
+\end{enumerate}
+
+%================================================
+\section{المعالجات متعددة الأنوية والتوازي}
+%================================================
+
+\subsection{المفاهيم}
+\begin{tarif}
+    \begin{itemize}
+        \item \mustalah{النواة}{Cœur}{Core}: معالج كامل (وحدة تحكم، وحدة حساب، سجلات، ذاكرة مخبئية \textenglish{L1}).
+        \item \mustalah{المعالج متعدد الأنوية}{Processeur multi-cœur}{Multi-core processor}: عدة أنوية في شريحة واحدة.
+        \item \mustalah{الخيط}{Thread}{Thread}: سلسلة من التعليمات تُنفذ بشكل مستقل. البرنامج قد يملك خيطًا واحدًا أو عدة خيوط.
+        \item \mustalah{المعالجة المتوازية}{Traitement parallèle}{Parallel processing}: تنفيذ عدة أجزاء من العمل
+              \textbf{في اللحظة نفسها} على أنوية مختلفة.
+    \end{itemize}
+\end{tarif}
+
+\begin{center}
+\begin{tikzpicture}[core/.style={unit, minimum width=2.4cm, minimum height=1.5cm}]
+    \draw[brandDark, very thick, rounded corners=8pt, fill=brandLight] (-6.1,-2.6) rectangle (6.1,2.1);
+    \node[font=\bfseries] at (0,1.75) {شريحة معالج من 4 أنوية};
+    \foreach \x/\i in {4.5/1, 1.5/2, -1.5/3, -4.5/4} {
+        \node[core] at (\x,0.6) {النواة \i\\{\scriptsize \textenglish{L1}، \textenglish{L2}}};
+    }
+    \node[unit=brandOrange, minimum width=11.2cm] at (0,-1.1) {الذاكرة المخبئية المشتركة \textenglish{L3}};
+    \node[unit=brandPurple, minimum width=4cm] (ram) at (0,-3.6) {الذاكرة الرئيسية \textenglish{RAM}};
+    \draw[sahmT, <->] (0,-1.6) -- (ram);
+\end{tikzpicture}
+\end{center}
+
+\begin{tashbih}
+    مطبخ فيه طباخ واحد (نواة واحدة) يحضّر الطبق تلو الآخر. مطبخ فيه 4 طباخين (4 أنوية) يحضّر 4 أطباق
+    في الوقت نفسه. لكنهم يتقاسمون الثلاجة نفسها (\textenglish{L3} و\textenglish{RAM})، وقد ينتظر أحدهم دوره
+    أمامها. وطبق واحد معقد لا يصبح أسرع إلا إذا استطعنا تقسيمه إلى مهام مستقلة.
+\end{tashbih}
+
+\subsection{\textenglish{Hyper-Threading}: نواة واحدة لخيطين}
+تقنية \mustalah{تعدد الخيوط المتزامن}{Multithreading simultané}{SMT, Hyper-Threading} تجعل النواة الواحدة تبدو
+كأنها نواتان: عندما ينتظر خيط معطيات من الذاكرة، يستعمل الخيط الثاني وحدات الحساب الفارغة. لهذا يُظهر
+معالجنا 8 «معالجات منطقية» رغم أنه يملك 4 أنوية فقط. لكن إذا كان الخيطان يحتاجان وحدة الحساب نفسها
+دائمًا، فلا نربح شيئًا تقريبًا، كما سنرى في التجربة.
+
+\subsection{تجربة: العمل نفسه على 1 و2 و4 و8 خيوط}
+البرنامج الآتي يحسب مجموع الجذور التربيعية لـ400 مليون عدد، ويقسم العمل بين $k$ خيوط:
+
+\cfile{ch5/threads.c}
+\screen{ch5/threads.out}
+
+\begin{sharh}
+    \s{18--26}{كل خيط يأخذ الأعداد $id$، $id + k$، $id + 2k$\dots فيحسب جزءًا من المجموع لا يتداخل مع الآخرين.}
+    \s{34--35}{\code{pthread\_create}: نطلق $k$ خيوط، يعمل كل واحد منها على نواة.}
+    \s{36--39}{\code{pthread\_join}: ننتظر انتهاء كل خيط، ثم نجمع النتائج الجزئية.}
+    \s{40--42}{التسريع $=$ الزمن بخيط واحد $\div$ الزمن بـ$k$ خيوط.}
+\end{sharh}
+
+\begin{center}
+\begin{tikzpicture}[x=1.1cm, y=1.1cm]
+    \draw[->, thick] (0,0) -- (8.6,0) node[right, font=\small] {الخيوط};
+    \draw[->, thick] (0,0) -- (0,4.4) node[above, font=\small] {التسريع};
+    \foreach \y in {1,2,3,4} \draw (0.08,\y) -- (-0.08,\y) node[left, font=\scriptsize] {\textenglish{\y}};
+    \foreach \x in {1,2,4,8} \draw (\x,0.08) -- (\x,-0.08) node[below, font=\scriptsize] {\textenglish{\x}};
+    \draw[brandMuted, dashed, thick] (1,1) -- (4,4) node[above, font=\scriptsize, lawn=brandMuted] {التسريع المثالي};
+    \draw[orangeDeep, very thick] (1,1) -- (2,1.98) -- (4,3.02) -- (8,3.05);
+    \foreach \x/\y in {1/1, 2/1.98, 4/3.02, 8/3.05} {
+        \fill[orangeDeep] (\x,\y) circle (2.5pt);
+        \node[font=\codefont\scriptsize, above left] at (\x,\y) {\textenglish{\y}};
+    }
+    \draw[brandTeal, dashed] (4,0) -- (4,4.2);
+    \node[font=\scriptsize, lawn=tealDeep, align=center] at (6,3.9) {4 أنوية فقط:\\الخيوط الإضافية لا تساعد هنا};
+\end{tikzpicture}
+\end{center}
+
+\begin{khatwa}[: كيف نقرأ هذه النتائج؟]
+    \begin{enumerate}
+        \item \textbf{خيطان}: التسريع \textenglish{1.98}، أي قريب جدًا من 2. العمل انقسم إلى نصفين مستقلين تمامًا.
+        \item \textbf{4 خيوط}: التسريع \textenglish{3.02} وليس 4. عندما تعمل الأنوية الأربعة معًا يسخن المعالج،
+              فيخفض تردده تلقائيًا. وجزء من البرنامج (إطلاق الخيوط وجمع النتائج) لا يتوازى.
+        \item \textbf{8 خيوط}: التسريع \textenglish{3.05}، تقريبًا مثل 4 خيوط. معالجنا فيه 4 أنوية حقيقية فقط،
+              والخيوط الإضافية تتقاسم وحدات الحساب نفسها، فلا يتقدم العمل أسرع.
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{قانون \textenglish{Amdahl}: حدود التوازي}
+معظم البرامج فيها جزء \textbf{لا يمكن توزيعه} (قراءة الملف، عرض النتيجة، انتظار المستعمل\dots).
+
+\begin{tarif}
+    إذا كان الجزء القابل للتوازي من البرنامج هو $p$ (بين 0 و1)، ولدينا $n$ نواة، فإن التسريع الأقصى هو:
+    \[ S(n) = \frac{1}{(1 - p) + \dfrac{p}{n}} \]
+\end{tarif}
+
+\begin{khatwa}[: برنامج 90\% منه قابل للتوازي]
+    $p = 0.9$، والجزء التسلسلي $1 - p = 0.1$.
+    \begin{enumerate}
+        \item بـ4 أنوية: $S = \dfrac{1}{0.1 + \frac{0.9}{4}} = \dfrac{1}{0.1 + 0.225} = \dfrac{1}{0.325} \approx 3.08$.
+        \item بـ16 نواة: $S = \dfrac{1}{0.1 + 0.05625} \approx 6.4$.
+        \item بعدد لا نهائي من الأنوية: $\dfrac{p}{n} \rightarrow 0$، فيصبح $S = \dfrac{1}{0.1} = 10$.
+    \end{enumerate}
+    مهما أضفنا أنوية، لن يكون البرنامج أسرع من 10 مرات، لأن الـ10\% التسلسلية تبقى كما هي.
+\end{khatwa}
+
+\begin{hal}
+    لاحظ أن قانون \textenglish{Amdahl} مع $p = 0.9$ و4 أنوية يعطي \textenglish{3.08}، وهو قريب جدًا من التسريع
+    \textenglish{3.02} الذي قسناه! القانون البسيط يشرح الواقع جيدًا.
+\end{hal}
+
+\subsection{الفوائد والتحديات}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|R|R|}
+    \hline
+    \ras{الفوائد} & \ras{التحديات} \\ \hline
+    أداء أكبر دون رفع التردد & يجب أن يُكتب البرنامج بخيوط متعددة، وهذا أصعب \\ \hline
+    استهلاك طاقة أقل لنفس العمل & الجزء التسلسلي يحد من التسريع (قانون \textenglish{Amdahl}) \\ \hline
+    تشغيل عدة برامج في الوقت نفسه بسلاسة & \textbf{التزامن}: خيطان يكتبان في المتغير نفسه قد يفسدان النتيجة \\ \hline
+    إذا تعطلت مهمة، تبقى الأنوية الأخرى تعمل & \textbf{تماسك الذاكرة المخبئية}: يجب أن ترى كل الأنوية القيمة نفسها للمتغير \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{mithal}[: مشكلة التزامن]
+    خيطان ينفذان \code{x = x + 1} على المتغير نفسه، و\textenglish{x = 5} في البداية:
+    \begin{enumerate}
+        \item الخيط 1 يقرأ \textenglish{x = 5}.
+        \item الخيط 2 يقرأ \textenglish{x = 5} أيضًا (قبل أن يكتب الأول).
+        \item الخيط 1 يحسب $5 + 1$ ويكتب 6.
+        \item الخيط 2 يحسب $5 + 1$ ويكتب 6 أيضًا.
+    \end{enumerate}
+    النتيجة 6 بدل 7: ضاعت زيادة واحدة! لهذا نستعمل \textbf{الأقفال} \textenglish{(mutex)} أو تعليمات \textbf{ذرّية}
+    (\code{lock add} في \textenglish{x86}) تمنع خيطين من تعديل المتغير في الوقت نفسه. في برنامجنا تجنبنا المشكلة:
+    كل خيط يكتب في خانته الخاصة \code{part[id]}.
+\end{mithal}
+
+%================================================
+\section{الذاكرة المخبئية وتسلسل الذاكرة}
+%================================================
+
+\subsection{المشكلة: الذاكرة بطيئة جدًا}
+المعالج قادر على تنفيذ عدة تعليمات في كل نانوثانية، لكن قراءة الذاكرة الرئيسية تحتاج حوالي 100 نانوثانية.
+لو انتظر المعالج الذاكرة في كل مرة، لبقي معظم الوقت دون عمل.
+
+\begin{tarif}
+    \mustalah{الذاكرة المخبئية}{Mémoire cache, antémémoire}{Cache memory}: ذاكرة صغيرة وسريعة جدًا (من نوع
+    \textenglish{SRAM}) قريبة من المعالج، تحفظ \textbf{نسخة} من المعطيات التي استُعملت مؤخرًا أو التي سنحتاجها قريبًا.
+\end{tarif}
+
+\begin{tashbih}
+    عندما تراجع للامتحان، لا تضع كل كتب المكتبة على مكتبك. تضع على المكتب الكتب التي تحتاجها الآن (\textenglish{L1})،
+    وفي الحقيبة كتب الأسبوع (\textenglish{L2})، وفي خزانة البيت كتب السنة (\textenglish{L3})، والباقي في المكتبة
+    البعيدة (\textenglish{RAM}). كلما كان المكان أقرب، كان أصغر وأسرع.
+\end{tashbih}
+
+\subsection{تسلسل الذاكرة}
+\begin{center}
+\begin{tikzpicture}
+    \foreach \y/\w/\t/\c/\d in {
+        3.6/1.6/{السجلات}/brandOrange/{أقل من \textenglish{1 KB}، أقل من \textenglish{1 ns}},
+        2.7/2.8/{\textenglish{L1}}/brandOrange!70!brandTeal/{\textenglish{32 KB}، حوالي \textenglish{1 ns}},
+        1.8/4.0/{\textenglish{L2}}/brandTeal/{\textenglish{256 KB}، حوالي \textenglish{4 ns}},
+        0.9/5.2/{\textenglish{L3}}/brandTeal!70!brandPurple/{\textenglish{8 MB}، حوالي \textenglish{10 ns}},
+        0.0/6.4/{الذاكرة الرئيسية \textenglish{RAM}}/brandPurple/{\textenglish{8 GB}، حوالي \textenglish{100 ns}},
+        -0.9/7.6/{القرص \textenglish{SSD}}/brandMuted/{\textenglish{256 GB}، حوالي \textenglish{100 µs}}} {
+        \fill[\c!35, draw=\c, thick] (-\w/2,\y) rectangle (\w/2,\y+0.8);
+        \node[font=\small\bfseries] at (0,\y+0.4) {\t};
+        \node[font=\scriptsize, anchor=east] at (-4.1,\y+0.4) {\d};
+    }
+    \draw[sahmO] (4.3,-0.9) -- (4.3,4.4) node[midway, right, font=\small, align=left] {أسرع\\أصغر\\أغلى};
+\end{tikzpicture}
+\end{center}
+
+\subsection{تجربة: نرى طبقات الذاكرة بأعيننا}
+البرنامج الآتي يقرأ جدولًا بترتيب عشوائي (كل قراءة تعطي عنوان القراءة التالية، فلا يستطيع المعالج التخمين)،
+ويقيس متوسط زمن القراءة الواحدة، لأحجام مختلفة من الجدول:
+
+\cfile{ch5/latency.c}
+\screen{ch5/latency.out}
+
+\begin{center}
+\begin{tikzpicture}[x=1.45cm, y=0.042cm]
+    \draw[->, thick] (0,0) -- (7.4,0) node[right, font=\small] {حجم المعطيات};
+    \draw[->, thick] (0,0) -- (0,125) node[above, font=\small] {الزمن \textenglish{(ns)}};
+    \foreach \y in {0,25,50,75,100} \draw (0.06,\y) -- (-0.06,\y) node[left, font=\scriptsize] {\textenglish{\y}};
+    \foreach \x/\t in {1/16 KB, 2/64 KB, 3/256 KB, 4/1 MB, 5/4 MB, 6/16 MB, 7/64 MB}
+        \node[font=\codefont\scriptsize, below] at (\x,-2) {\textenglish{\t}};
+    \fill[brandOrange!15] (0.5,0) rectangle (1.6,125); \node[font=\scriptsize] at (1.05,118) {\textenglish{L1}};
+    \fill[brandTeal!15] (1.6,0) rectangle (3.4,125); \node[font=\scriptsize] at (2.5,118) {\textenglish{L2}};
+    \fill[brandPurple!12] (3.4,0) rectangle (5.6,125); \node[font=\scriptsize] at (4.5,118) {\textenglish{L3}};
+    \fill[brandMuted!12] (5.6,0) rectangle (7.3,125); \node[font=\scriptsize] at (6.45,118) {\textenglish{RAM}};
+    \draw[orangeDeep, very thick] (1,1.7) -- (2,2.2) -- (3,4.1) -- (4,9.2) -- (5,12.8) -- (6,83.5) -- (7,112.7);
+    \foreach \x/\y in {1/1.7, 2/2.2, 3/4.1, 4/9.2, 5/12.8, 6/83.5, 7/112.7} {
+        \fill[orangeDeep] (\x,\y) circle (2.5pt);
+        \node[font=\codefont\scriptsize, above] at (\x,\y+2) {\textenglish{\y}};
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{khatwa}[: ماذا نرى في المنحنى؟]
+    \begin{enumerate}
+        \item \textbf{حتى \textenglish{32 KB}}: الجدول كله في \textenglish{L1}، والقراءة تستغرق \textenglish{1.7 ns} فقط.
+        \item \textbf{\textenglish{64 KB} و\textenglish{256 KB}}: الجدول لم يعد يدخل في \textenglish{L1}، فنقرأ من \textenglish{L2}: الزمن يرتفع إلى \textenglish{2} ثم \textenglish{4 ns}.
+        \item \textbf{\textenglish{1 MB} و\textenglish{4 MB}}: نقرأ من \textenglish{L3} المشتركة: حوالي \textenglish{9} إلى \textenglish{13 ns}.
+        \item \textbf{\textenglish{16 MB} فأكثر}: الجدول أكبر من \textenglish{L3} (\textenglish{8 MB})، فنذهب إلى \textenglish{RAM}:
+              الزمن يقفز إلى \textenglish{84} ثم \textenglish{113 ns}، أي أبطأ بحوالي \textbf{65 مرة} من \textenglish{L1}!
+    \end{enumerate}
+    الدرجات في المنحنى تقع بالضبط عند أحجام الذاكرات المخبئية لمعالجنا.
+\end{khatwa}
+
+\subsection{مبدأ المحلية: لماذا تنجح الذاكرة المخبئية؟}
+الذاكرة المخبئية صغيرة، لكنها تحتوي في الغالب على ما نحتاجه، بفضل سلوكين طبيعيين في البرامج:
+\begin{itemize}
+    \item \mustalah{المحلية الزمنية}{Localité temporelle}{Temporal locality}: المعطاة التي استعملناها الآن سنستعملها
+          غالبًا \textbf{مرة أخرى قريبًا} (عدّاد الحلقة، المجموع\dots).
+    \item \mustalah{المحلية المكانية}{Localité spatiale}{Spatial locality}: بعد قراءة عنوان، نقرأ غالبًا
+          \textbf{العناوين المجاورة} (عناصر جدول، تعليمات متتالية).
+\end{itemize}
+
+\begin{tarif}
+    \mustalah{سطر الذاكرة المخبئية}{Ligne de cache}{Cache line}: الذاكرة المخبئية لا تنقل بايتًا واحدًا، بل
+    كتلة كاملة من \textbf{64 بايتًا} مجاورة. عندما نقرأ \code{t[0]}، تصل معه \code{t[1]} إلى \code{t[15]} (للأعداد من 4 بايتات) مجانًا.
+\end{tarif}
+
+\subsection{تجربة: ترتيب القراءة يغيّر كل شيء}
+\cfile{ch5/locality.c}
+\screen{ch5/locality.out}
+
+\begin{center}
+\begin{tikzpicture}[c/.style={draw=brandDark, minimum size=0.55cm}]
+    \foreach \i in {0,...,3} \foreach \j in {0,...,3} \node[c] at (-\j*0.55-4.2, -\i*0.55) {};
+    \foreach \i in {0,...,3} \draw[sahmT] (-6.0, -\i*0.55) -- (-4.0, -\i*0.55);
+    \node[font=\small, align=center] at (-5.0,0.75) {سطرًا بسطر: كل قراءة\\بجوار التي قبلها};
+    \foreach \i in {0,...,3} \foreach \j in {0,...,3} \node[c] at (\j*0.55+3.0, -\i*0.55) {};
+    \foreach \j in {0,...,3} \draw[sahmO] (\j*0.55+3.0, 0.2) -- (\j*0.55+3.0, -1.85);
+    \node[font=\small, align=center] at (3.8,0.75) {عمودًا بعمود: كل قراءة\\تقفز \textenglish{16 KB}};
+\end{tikzpicture}
+\end{center}
+
+\begin{khatwa}[: لماذا الأعمدة أبطأ بـ33 مرة؟]
+    \begin{enumerate}
+        \item في لغة \textenglish{C}، الجدول \code{m[4096][4096]} محفوظ \textbf{سطرًا بعد سطر}: \code{m[0][0]} ثم \code{m[0][1]} ثم\dots
+        \item \textbf{سطرًا بسطر}: كل سطر ذاكرة مخبئية (64 بايتًا) يحتوي على 16 عددًا متجاورًا. نقرأ من \textenglish{RAM} مرة، ثم نستعمل
+              16 عددًا من الذاكرة المخبئية. والمعالج يلاحظ أننا نتقدم بانتظام فيجلب الأسطر القادمة مسبقًا.
+        \item \textbf{عمودًا بعمود}: \code{m[0][j]} و\code{m[1][j]} بينهما $4096 \times 4 = 16\,384$ بايتًا. كل قراءة
+              في سطر ذاكرة مخبئية جديد، فنستعمل عددًا واحدًا فقط من كل 16 عددًا نقلناها.
+        \item النتيجة الحقيقية: \textenglish{0.009 s} مقابل \textenglish{0.301 s}، أي حوالي \textbf{33 مرة} أبطأ،
+              لنفس العمليات تمامًا!
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{الإصابة والإخفاق وزمن الوصول المتوسط}
+\begin{tarif}
+    \begin{itemize}
+        \item \mustalah{الإصابة}{Succès}{Hit}: المعطاة موجودة في الذاكرة المخبئية.
+        \item \mustalah{الإخفاق}{Défaut}{Miss}: المعطاة غير موجودة، فنذهب إلى المستوى التالي (الأبطأ).
+        \item \textbf{معدل الإصابة} $h$: نسبة القراءات التي وجدت معطياتها في الذاكرة المخبئية.
+    \end{itemize}
+    \[ \text{الزمن المتوسط} = h \times t_{cache} + (1 - h) \times t_{RAM} \]
+\end{tarif}
+
+\begin{khatwa}[: \textenglish{$t_{cache} = 1$ ns}، \textenglish{$t_{RAM} = 100$ ns}]
+    \begin{enumerate}
+        \item معدل إصابة 90\%: $0.9 \times 1 + 0.1 \times 100 = 0.9 + 10 = 10.9$ \textenglish{ns}.
+        \item معدل إصابة 99\%: $0.99 \times 1 + 0.01 \times 100 = 0.99 + 1 = 1.99$ \textenglish{ns}.
+    \end{enumerate}
+    الانتقال من 90\% إلى 99\% يجعل الذاكرة \textbf{أسرع بأكثر من 5 مرات}. لهذا تهتم المعالجات الحديثة جدًا
+    بتحسين معدل الإصابة.
+\end{khatwa}
+
+\subsection{أين نضع المعطاة في الذاكرة المخبئية؟ (التطابق)}
+الذاكرة المخبئية مقسمة إلى أسطر. علينا أن نقرر في أي سطر نضع كتلة قادمة من الذاكرة:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.4cm}|R|R|}
+    \hline
+    \ras{النوع} & \ras{القاعدة} & \ras{الميزة والعيب} \\ \hline
+    التطابق المباشر \textenglish{(direct mapped)} & كل كتلة لها سطر واحد ممكن: رقم الكتلة \textenglish{mod} عدد الأسطر & بسيط وسريع، لكن كتلتان قد تتصارعان على السطر نفسه \\ \hline
+    التجميعي الكامل \textenglish{(fully associative)} & أي كتلة في أي سطر & أقل صراعات، لكن البحث في كل الأسطر مكلف \\ \hline
+    التجميعي بمجموعات \textenglish{(set associative)} & الكتلة تذهب إلى مجموعة محددة، وفيها إلى أي سطر من $k$ أسطر & الحل الوسط المستعمل في كل المعالجات الحديثة \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{khatwa}[: تقسيم عنوان في ذاكرة مخبئية بتطابق مباشر]
+    ذاكرة مخبئية سعتها \textenglish{1 KB}، وأسطرها من 16 بايتًا، والعناوين من 16 بتًا.
+    \begin{enumerate}
+        \item عدد الأسطر: $1024 \div 16 = 64 = 2^6$ سطرًا، إذن نحتاج \textbf{6 بتات} لرقم السطر.
+        \item داخل السطر 16 بايتًا $= 2^4$، إذن \textbf{4 بتات} للإزاحة.
+        \item الباقي: $16 - 6 - 4 = 6$ بتات، وتسمى \textbf{الوسم} \textenglish{(tag)}: تحدد أي كتلة من الذاكرة موجودة الآن في السطر.
+    \end{enumerate}
+    \begin{center}
+    \begin{tikzpicture}[f/.style={draw=brandDark, thick, minimum height=0.7cm, font=\small\bfseries}]
+        % drawn left to right, like the binary address: tag first
+        \node[f, minimum width=3cm, fill=brandOrange!20] (t) at (0,0) {الوسم: 6 بتات};
+        \node[f, minimum width=3cm, fill=brandTeal!20, anchor=west] (l) at (t.east) {السطر: 6 بتات};
+        \node[f, minimum width=2cm, fill=brandGreen!20, anchor=west] (o) at (l.east) {الإزاحة: 4 بتات};
+        \node[font=\codefont\scriptsize, below=1pt of t.south west, anchor=north west] {\textenglish{bit 15}};
+        \node[font=\codefont\scriptsize, below=1pt of o.south east, anchor=north east] {\textenglish{bit 0}};
+    \end{tikzpicture}
+    \end{center}
+    مثال: $\hex{1A2C} = \bin{000110\,100010\,1100}$. الوسم $\bin{000110} = 6$، والسطر $\bin{100010} = 34$، والإزاحة $\bin{1100} = 12$.
+\end{khatwa}
+
+\begin{intabih}
+    العنوان الثنائي يُكتب دائمًا من اليسار إلى اليمين، حتى في كتاب بالعربية: البتات العليا (الوسم) على اليسار
+    والبت 0 على اليمين، تمامًا كما رسمناه في الشكل.
+\end{intabih}
+
+\subsection{الاستبدال والكتابة}
+\begin{itemize}
+    \item \textbf{سياسة الاستبدال}: عندما تمتلئ المجموعة، أي سطر نطرد؟ غالبًا \textenglish{LRU} \textenglish{(Least Recently Used)}:
+          السطر الذي لم نستعمله منذ أطول مدة.
+    \item \textbf{سياسة الكتابة}:
+    \begin{itemize}
+        \item \textenglish{Write-through}: نكتب في الذاكرة المخبئية وفي \textenglish{RAM} معًا. بسيط لكنه بطيء.
+        \item \textenglish{Write-back}: نكتب في الذاكرة المخبئية فقط، ولا نكتب في \textenglish{RAM} إلا عندما نطرد السطر. أسرع، وهو المستعمل اليوم.
+    \end{itemize}
+\end{itemize}
+
+\begin{hal}
+    تذكر نموذج هارفارد من الفصل الأول: ذاكرة \textenglish{L1} مقسمة إلى جزأين، \textenglish{L1i} للتعليمات
+    و\textenglish{L1d} للمعطيات (في معالجنا \textenglish{32 KB} لكل واحدة)، فيستطيع المعالج جلب تعليمة وقراءة معطاة
+    في الوقت نفسه. أما \textenglish{L2} و\textenglish{L3} و\textenglish{RAM} فمشتركة بينهما، كما في نموذج فون نيومان.
+\end{hal}
+
+%================================================
+\section{تمارين}
+%================================================
+
+\begin{tamrin}
+    برنامج 75\% منه قابل للتوازي. احسب التسريع بـ2 و4 و8 أنوية، والتسريع الأقصى.
+\end{tamrin}
+\begin{hall}
+    $1 - p = 0.25$. \quad $S(2) = \dfrac{1}{0.25 + 0.375} = 1.6$، \quad $S(4) = \dfrac{1}{0.25 + 0.1875} \approx 2.29$،
+    \quad $S(8) = \dfrac{1}{0.25 + 0.09375} \approx 2.91$. الأقصى $= \dfrac{1}{0.25} = 4$.
+\end{hall}
+
+\begin{tamrin}
+    ذاكرة مخبئية زمنها \textenglish{2 ns}، والذاكرة الرئيسية \textenglish{80 ns}، ومعدل الإصابة 95\%. ما الزمن المتوسط؟
+\end{tamrin}
+\begin{hall}
+    $0.95 \times 2 + 0.05 \times 80 = 1.9 + 4 = 5.9$ \textenglish{ns}.
+\end{hall}
+
+\begin{tamrin}
+    ذاكرة مخبئية بتطابق مباشر: \textenglish{4 KB}، أسطر من 32 بايتًا، عناوين من 32 بتًا. كم بتًا للإزاحة وللسطر وللوسم؟
+\end{tamrin}
+\begin{hall}
+    الإزاحة: $32 = 2^5$، إذن 5 بتات. الأسطر: $4096 \div 32 = 128 = 2^7$، إذن 7 بتات. الوسم: $32 - 7 - 5 = 20$ بتًا.
+\end{hall}
+
+\begin{tamrin}
+    اشرح لماذا يكون هذا الكود بطيئًا، وكيف نصلحه:
+    \begin{codebox}\begin{english}\codefont\small
+    for (j = 0; j < N; j++) \\
+    \hspace*{2em}for (i = 0; i < N; i++) \\
+    \hspace*{4em}s += m[i][j];
+    \end{english}\end{codebox}
+\end{tamrin}
+\begin{hall}
+    يقرأ الجدول عمودًا بعمود، فكل قراءة في سطر ذاكرة مخبئية مختلف (لا محلية مكانية). نصلحه بتبديل الحلقتين:
+    \code{for (i ...) for (j ...)}، فنقرأ سطرًا بسطر.
+\end{hall}
+
+\begin{tamrin}
+    لماذا لم يتحسن البرنامج \code{threads.c} عند الانتقال من 4 إلى 8 خيوط في معالجنا؟
+\end{tamrin}
+\begin{hall}
+    لأن المعالج يملك 4 أنوية حقيقية فقط. الخيوط 5 إلى 8 تعمل بتقنية \textenglish{Hyper-Threading} على الأنوية نفسها،
+    والبرنامج يستعمل وحدة الحساب طوال الوقت، فلا توجد وحدات فارغة يستفيد منها الخيط الثاني.
+\end{hall}

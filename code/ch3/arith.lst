@@ -1,0 +1,9 @@
+ 100:	b0 19                	mov    al,0x19
+ 102:	04 11                	add    al,0x11
+ 104:	2c 02                	sub    al,0x2
+ 106:	fe c0                	inc    al
+ 108:	fe c8                	dec    al
+ 10a:	f6 d8                	neg    al
+ 10c:	bb e8 03             	mov    bx,0x3e8
+ 10f:	81 c3 c4 09          	add    bx,0x9c4
+ 113:	c3                   	ret    

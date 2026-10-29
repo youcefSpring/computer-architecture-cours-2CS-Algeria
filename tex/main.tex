@@ -1,0 +1,114 @@
+\documentclass[11pt, a4paper, oneside]{report}
+\input{style}
+
+\begin{document}
+
+%================================================
+% Cover
+%================================================
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+    \fill[brandTeal!12] (current page.north west) rectangle ([yshift=-8cm]current page.north east);
+    \draw[brandTeal, line width=1.5pt, opacity=0.35]
+        ([xshift=-3cm, yshift=4cm]current page.south east) circle (6cm);
+    \draw[brandOrange, line width=1pt, opacity=0.35]
+        ([xshift=-3cm, yshift=4cm]current page.south east) circle (7cm);
+    % a small chip drawing
+    \begin{scope}[shift={([xshift=4.5cm, yshift=-4.2cm]current page.north west)}, scale=0.9]
+        \fill[brandDark] (-1.5,-1.5) rectangle (1.5,1.5);
+        \fill[brandTeal] (-1,-1) rectangle (1,1);
+        \node[font=\codefont\bfseries\Large, lawn=white] at (0,0) {\textenglish{CPU}};
+        \foreach \i in {-1.2,-0.6,0,0.6,1.2} {
+            \draw[brandMuted, line width=2pt] (\i,1.5) -- (\i,2);
+            \draw[brandMuted, line width=2pt] (\i,-1.5) -- (\i,-2);
+            \draw[brandMuted, line width=2pt] (1.5,\i) -- (2,\i);
+            \draw[brandMuted, line width=2pt] (-1.5,\i) -- (-2,\i);
+        }
+    \end{scope}
+\end{tikzpicture}
+
+\vspace*{1.2cm}
+\begin{flushright}
+    {\khatt\bfseries\color{tealDeep}\Large مقياس \textenglish{UEF31}}\\[0.6cm]
+    {\khatt\bfseries\color{brandDark}\fontsize{38}{46}\selectfont هندسة الحواسيب}\\[0.4cm]
+    {\large\color{brandMuted}\textenglish{Architecture des ordinateurs}}
+\end{flushright}
+
+\vspace{4.5cm}
+\begin{tcolorbox}[enhanced, colback=white, colframe=brandTeal, arc=6pt, boxrule=1.2pt,
+    width=0.85\linewidth]
+    \large
+    \begin{itemize}
+        \item الفصل الأول: التنظيم العام للوحدة المركزية للحاسوب
+        \item الفصل الثاني: البنية الداخلية للمعالج
+        \item الفصل الثالث: دراسة حالة، المعالج \textenglish{Intel 8086}
+        \item الفصل الرابع: المعالجات ذات \textenglish{32} و\textenglish{64} بت
+        \item الفصل الخامس: بنية المعالجات الحديثة
+    \end{itemize}
+\end{tcolorbox}
+
+\vfill
+\begin{flushright}
+    \begin{tabular}{@{}ll}
+        \textbf{الأستاذ:} & د. بن عبد الرزاق يوسف \\
+        \textbf{المعامل:} & \textenglish{3} \quad\textbf{الأرصدة:} \textenglish{5} \\
+        \textbf{التقييم:} & امتحان \textenglish{60\%}، مراقبة مستمرة \textenglish{40\%} \\
+    \end{tabular}
+\end{flushright}
+\end{titlepage}
+
+%================================================
+% How to use this course
+%================================================
+\chapter*{كيف تستعمل هذا الدرس؟}
+\addcontentsline{toc}{chapter}{كيف تستعمل هذا الدرس؟}
+\markboth{كيف تستعمل هذا الدرس؟}{}
+
+هذا الدرس مكتوب لك أنت، حتى لو كانت هذه أول مرة تفتح فيها «صندوق» الحاسوب.
+نبدأ من الأشياء البسيطة، ونصعد خطوة خطوة حتى نكتب برامج حقيقية بلغة التجميع
+\textenglish{(Assembly)}، ثم نفهم كيف تعمل المعالجات الحديثة في هواتفنا وحواسيبنا.
+
+\section*{الصناديق الملونة}
+ستجد في كل صفحة صناديق ملونة، لكل لون دور:
+
+\begin{tarif}
+    كلمة جديدة مهمة، مع اسمها بالفرنسية والإنجليزية لأنك ستجدها في الكتب والمراجع.
+\end{tarif}
+\begin{tashbih}
+    نشرح الفكرة الصعبة بشيء تعرفه من حياتك اليومية: المطبخ، المدرسة، الحافلة\dots
+\end{tashbih}
+\begin{khatwa}
+    حساب أو تنفيذ نقوم به مرحلة بمرحلة، دون أن نقفز أي خطوة.
+\end{khatwa}
+\begin{intabih}
+    خطأ يقع فيه كثير من الطلبة، أو تفصيل صغير يغيّر النتيجة.
+\end{intabih}
+\begin{hal}
+    معلومة إضافية ممتعة، ليست ضرورية للامتحان لكنها تساعدك على الفهم.
+\end{hal}
+
+\section*{البرامج في هذا الدرس}
+\begin{itemize}
+    \item كل برنامج مكتوب كاملًا، ومرفوق بجدول \textbf{«ماذا يفعل كل سطر؟»}.
+    \item برامج المعالج \textenglish{8086} مكتوبة لبرنامج المحاكاة \textenglish{EMU8086}،
+          وبرامج \textenglish{64} بت مكتوبة لـ\textenglish{NASM} على نظام \textenglish{Linux}.
+    \item كل البرامج \textbf{جُرّبت فعلًا}: ما تراه في الشاشة السوداء \faDesktop{} هو ما يظهر عند التنفيذ،
+          وجداول السجلات مأخوذة من التنفيذ الحقيقي.
+\end{itemize}
+
+\begin{intabih}
+    لا تكتفِ بالقراءة! انسخ كل برنامج في \textenglish{EMU8086}، ونفّذه تعليمة بتعليمة
+    (زر \textenglish{Single Step})، وراقب تغيّر السجلات. هكذا يُفهم هذا المقياس.
+\end{intabih}
+
+\tableofcontents
+
+\include{ch1}
+\include{ch2}
+\include{ch3}
+\include{ch4}
+\include{ch5}
+\include{appendix}
+
+\end{document}

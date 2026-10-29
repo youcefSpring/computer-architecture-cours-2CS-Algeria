@@ -1,0 +1,21 @@
+ 100:	b8 ea 07             	mov    ax,0x7ea
+ 103:	e8 07 00             	call   0x10d
+ 106:	b8 07 00             	mov    ax,0x7
+ 109:	e8 01 00             	call   0x10d
+ 10c:	c3                   	ret    
+ 10d:	bb 0a 00             	mov    bx,0xa
+ 110:	b9 00 00             	mov    cx,0x0
+ 113:	ba 00 00             	mov    dx,0x0
+ 116:	f7 f3                	div    bx
+ 118:	52                   	push   dx
+ 119:	41                   	inc    cx
+ 11a:	83 f8 00             	cmp    ax,0x0
+ 11d:	75 f4                	jne    0x113
+ 11f:	5a                   	pop    dx
+ 120:	80 c2 30             	add    dl,0x30
+ 123:	b4 02                	mov    ah,0x2
+ 125:	cd 21                	int    0x21
+ 127:	e2 f6                	loop   0x11f
+ 129:	b2 20                	mov    dl,0x20
+ 12b:	cd 21                	int    0x21
+ 12d:	c3                   	ret    

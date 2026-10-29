@@ -1,0 +1,1173 @@
+\chapter{دراسة حالة: المعالج \textenglish{Intel 8086}}
+
+\begin{khulasa}[: ماذا سنتعلم في هذا الفصل؟]
+\begin{itemize}
+    \item عائلة \textenglish{80x86}، والبنية الداخلية للمعالج \textenglish{8086}.
+    \item سجلات المعالج \textenglish{8086}، والعنونة المقطعية (كيف نحسب العنوان الفيزيائي).
+    \item كتابة أول برنامج، وكيف تُنفَّذ تعليمة داخل المعالج.
+    \item التعليمات: النقل، الحساب، المنطق، القفز، الحلقات، ثم كيف تتحول التعليمة إلى لغة الآلة.
+    \item الإدخال والإخراج، المكدس، الإجراءات، والمقاطعات.
+\end{itemize}
+\end{khulasa}
+
+%================================================
+\section{عائلة \textenglish{80x86}}
+%================================================
+
+في سنة 1978 أطلقت شركة \textenglish{Intel} المعالج \textenglish{8086}. نجح نجاحًا كبيرًا لأن شركة
+\textenglish{IBM} اختارت أخاه \textenglish{8088} لأول حاسوب شخصي \textenglish{(IBM PC)} سنة 1981. ومن
+يومها، كل معالج جديد من \textenglish{Intel} و\textenglish{AMD} يبقى قادرًا على تنفيذ برامج \textenglish{8086}.
+هذه العائلة تسمى \textenglish{x86}.
+
+\begin{tarif}
+    \mustalah{التوافق مع الأجيال السابقة}{Compatibilité ascendante}{Backward compatibility}: المعالج الجديد يفهم
+    كل تعليمات المعالجات القديمة من عائلته. برنامج كُتب للمعالج \textenglish{8086} سنة 1980 يمكن أن يعمل
+    على معالج \textenglish{Core i7} حديث. هذا ما جعل عائلة \textenglish{x86} تبقى أكثر من 45 سنة.
+\end{tarif}
+
+\begin{hal}
+    الفرق الوحيد بين \textenglish{8086} و\textenglish{8088} هو \textbf{حافلة المعطيات الخارجية}: 16 بتًا في \textenglish{8086}
+    و8 بتات فقط في \textenglish{8088}. من الداخل هما متطابقان. اختارت \textenglish{IBM} المعالج \textenglish{8088} لأن
+    الدارات المساعدة ذات 8 بتات كانت أرخص في ذلك الوقت.
+\end{hal}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|l|}
+    \hline
+    \ras{المعالج} & \ras{السنة} & \ras{عدد البتات} & \ras{الذاكرة القصوى} & \ras{الجديد فيه} \\ \hline
+    \textenglish{8086 / 8088} & 1978 & 16 & \textenglish{1 MB} & أول معالج من العائلة \\ \hline
+    \textenglish{80286} & 1982 & 16 & \textenglish{16 MB} & النمط المحمي \\ \hline
+    \textenglish{80386} & 1985 & 32 & \textenglish{4 GB} & أول معالج 32 بتًا \textenglish{(IA-32)} \\ \hline
+    \textenglish{80486} & 1989 & 32 & \textenglish{4 GB} & ذاكرة مخبئية ووحدة الأعداد الحقيقية داخله \\ \hline
+    \textenglish{Pentium} & 1993 & 32 & \textenglish{4 GB} & تنفيذ تعليمتين معًا \\ \hline
+    \textenglish{Athlon 64} \textenglish{(AMD)} & 2003 & 64 & $2^{48}$ عمليًا & المعمارية \textenglish{AMD64 (x86-64)} \\ \hline
+    \textenglish{Core i7} وما بعده & 2008 & 64 & ضخمة & عدة أنوية في الشريحة نفسها \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{tarif}
+    \textbf{الخصائص العامة للمعالج \textenglish{8086}}:
+    \begin{itemize}
+        \item معالج \textbf{16 بتًا}: سجلاته وحافلة معطياته من 16 بتًا.
+        \item حافلة عناوين من \textbf{20 بتًا}: يستطيع عنونة \textenglish{1 MB} من الذاكرة.
+        \item حوالي \textenglish{29\,000} ترانزستور، وتردد بين \textenglish{5} و\textenglish{10 MHz}.
+        \item يملك حوالي \textbf{100 تعليمة} مختلفة (معالج \textenglish{CISC}).
+    \end{itemize}
+\end{tarif}
+
+%================================================
+\section{البنية الداخلية للمعالج \textenglish{8086}}
+%================================================
+
+ينقسم المعالج \textenglish{8086} إلى وحدتين تعملان \textbf{في الوقت نفسه}:
+
+\begin{center}
+\begin{tikzpicture}[r/.style={reg, minimum width=1.25cm, font=\codefont\small}]
+    % BIU
+    \draw[brandOrange, very thick, rounded corners=6pt, fill=brandOrange!8] (0.3,-3.2) rectangle (6.3,2.6);
+    \node[font=\bfseries, lawn=orangeDeep] at (3.3,2.25) {وحدة الربط بالحافلة \textenglish{(BIU)}};
+    \node[r] at (4.6,1.4) {\textenglish{CS}}; \node[r] at (4.6,0.8) {\textenglish{DS}};
+    \node[r] at (4.6,0.2) {\textenglish{SS}}; \node[r] at (4.6,-0.4) {\textenglish{ES}};
+    \node[r] at (4.6,-1.0) {\textenglish{IP}};
+    \node[draw=brandDark, fill=brandOrange!25, thick, minimum width=1.4cm, minimum height=0.6cm, font=\small] at (2,1.1) {مجمّع $\Sigma$};
+    \node[font=\scriptsize, align=center] at (2,0.35) {يحسب العنوان\\الفيزيائي};
+    \foreach \i in {0,...,5} \node[draw=brandDark, fill=white, minimum width=0.55cm, minimum height=0.5cm] at (1.2+0.6*\i,-2.1) {};
+    \node[font=\scriptsize] at (2.7,-2.75) {طابور التعليمات (6 بايتات)};
+    % EU
+    \draw[brandTeal, very thick, rounded corners=6pt, fill=brandTeal!8] (-6.6,-3.2) rectangle (-0.3,2.6);
+    \node[font=\bfseries, lawn=tealDeep] at (-3.45,2.25) {وحدة التنفيذ \textenglish{(EU)}};
+    \foreach \n/\y in {AX/1.4, BX/0.8, CX/0.2, DX/-0.4} \node[r] at (-1.3,\y) {\textenglish{\n}};
+    \foreach \n/\y in {SI/1.4, DI/0.8, BP/0.2, SP/-0.4} \node[r] at (-2.7,\y) {\textenglish{\n}};
+    \draw[brandGreen!70!black, very thick, fill=brandGreen!20] (-5.9,1.2) -- (-4.1,1.2) -- (-4.5,-0.2) -- (-5.5,-0.2) -- cycle;
+    \node[font=\bfseries\small] at (-5,0.5) {\textenglish{UAL}};
+    \node[r, minimum width=2.5cm, font=\small] at (-5,-1.0) {الأعلام \textenglish{FLAGS}};
+    \node[unit=brandOrange, font=\small, minimum width=2.6cm] at (-2.2,-2.1) {وحدة التحكم};
+    % links
+    \draw[sahmT, <->] (-0.3,-2.1) -- (0.3,-2.1);
+    \draw[brandDark, line width=4pt, {Stealth[length=4mm]}-{Stealth[length=4mm]}] (6.3,0.2) -- (7.8,0.2);
+    \node[font=\small, align=center] at (7.1,-0.5) {حافلة\\النظام};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+    \item \mustalah{وحدة الربط بالحافلة}{Bus Interface Unit}{BIU}: تتكلم مع الذاكرة. تحسب العناوين،
+          تجلب التعليمات مسبقًا وتضعها في \textbf{طابور} من 6 بايتات، وتقرأ وتكتب المعطيات.
+    \item \mustalah{وحدة التنفيذ}{Execution Unit}{EU}: تأخذ التعليمات من الطابور، تفك ترميزها، وتنفذها
+          بوحدة الحساب والمنطق.
+\end{itemize}
+
+\begin{tashbih}
+    في مطعم: \textbf{النادل} (\textenglish{BIU}) يأتي بالطلبات من الزبائن ويضعها في صف أمام الطباخ،
+    بينما \textbf{الطباخ} (\textenglish{EU}) يحضّر الطلب الحالي. الطباخ لا ينتظر النادل، لأن الطلب القادم
+    موجود دائمًا في الصف. هذه أول فكرة لخط الأنابيب!
+\end{tashbih}
+
+%================================================
+\section{سجلات المعالج \textenglish{8086}}
+%================================================
+
+يملك المعالج \textenglish{8086} \textbf{14 سجلًا} من 16 بتًا.
+
+\subsection{السجلات العامة}
+أربعة سجلات للمعطيات، ويمكن تقسيم كل واحد منها إلى نصفين من 8 بتات:
+
+\begin{center}
+\begin{tikzpicture}[h/.style={draw=brandDark, thick, minimum width=2.2cm, minimum height=0.7cm, font=\codefont\bfseries}]
+    \foreach \r/\n/\d [count=\i from 0] in {A/AX/{المركِّم: الحساب، الضرب، القسمة، الإدخال والإخراج},
+                                         B/BX/{القاعدة: يحفظ عنوانًا في الذاكرة},
+                                         C/CX/{العدّاد: عدد دورات الحلقات},
+                                         D/DX/{المعطيات: مع \textenglish{AX} في الضرب والقسمة}} {
+        \node[h, fill=brandTeal!25] (hi\i) at (-2.2,-0.9*\i) {\textenglish{\r H}};
+        \node[h, fill=brandTeal!10] (lo\i) at (0,-0.9*\i) {\textenglish{\r L}};
+        \node[font=\codefont\bfseries, lawn=tealDeep] at (1.6,-0.9*\i) {\textenglish{\n}};
+        \node[font=\small, anchor=east] at (-3.6,-0.9*\i) {\d};
+    }
+    \node[font=\scriptsize] at (-2.2,0.6) {البتات 15 إلى 8};
+    \node[font=\scriptsize] at (0,0.6) {البتات 7 إلى 0};
+\end{tikzpicture}
+\end{center}
+
+\begin{mithal}
+    إذا كان \textenglish{AX = \hex{1234}} فإن \textenglish{AH = \hex{12}} و\textenglish{AL = \hex{34}}.
+    إذا غيّرنا \textenglish{AL} إلى \hex{FF} يصبح \textenglish{AX = \hex{12FF}}.
+\end{mithal}
+
+لماذا نقسم السجلات؟ لأننا نعمل كثيرًا بقيم صغيرة (حرف، رقم بين 0 و255). بدل أن نضيّع سجلًا كاملًا من
+16 بتًا لحرف واحد، نستطيع وضع حرفين في سجل واحد: واحد في \textenglish{AH} وآخر في \textenglish{AL}.
+
+\begin{intabih}
+    هذه السجلات «عامة» لأننا نستطيع استعمالها في أي حساب، لكن بعض التعليمات تفرض سجلًا معينًا:
+    \code{loop} تستعمل دائمًا \textenglish{CX}، و\code{mul} و\code{div} تستعملان دائمًا \textenglish{AX} و\textenglish{DX}،
+    ووظائف \code{int 21h} تنتظر رقم الوظيفة في \textenglish{AH}. لهذا يجب أن نحفظ هذه الأدوار.
+\end{intabih}
+
+\subsection{سجلات المؤشرات والفهارس}
+\begin{center}
+\begin{tabular}{|c|l|l|}
+    \hline
+    \ras{السجل} & \ras{الاسم} & \ras{الدور} \\ \hline
+    \textenglish{SI} & \textenglish{Source Index} & فهرس المصدر (للجداول والسلاسل) \\ \hline
+    \textenglish{DI} & \textenglish{Destination Index} & فهرس الوجهة \\ \hline
+    \textenglish{SP} & \textenglish{Stack Pointer} & يشير إلى قمة المكدس \\ \hline
+    \textenglish{BP} & \textenglish{Base Pointer} & للوصول إلى معطيات داخل المكدس \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{mithal}
+    لنمر على جدول من 10 عناصر، نضع عنوان بدايته في \textenglish{SI}، ثم نزيد \textenglish{SI} في كل دورة
+    (\code{inc si}): في الدورة الأولى يشير \textenglish{SI} إلى العنصر الأول، وفي الثانية إلى الثاني، وهكذا.
+    \textenglish{SI} هنا يلعب دور \textbf{الإصبع} الذي نضعه على العنصر الذي نقرؤه الآن.
+\end{mithal}
+
+\subsection{سجلات المقاطع}
+\begin{center}
+\begin{tabular}{|c|l|l|}
+    \hline
+    \ras{السجل} & \ras{الاسم} & \ras{يشير إلى بداية\dots} \\ \hline
+    \textenglish{CS} & \textenglish{Code Segment} & مقطع البرنامج (التعليمات) \\ \hline
+    \textenglish{DS} & \textenglish{Data Segment} & مقطع المعطيات (المتغيرات) \\ \hline
+    \textenglish{SS} & \textenglish{Stack Segment} & مقطع المكدس \\ \hline
+    \textenglish{ES} & \textenglish{Extra Segment} & مقطع إضافي (نسخ السلاسل مثلًا) \\ \hline
+\end{tabular}
+\end{center}
+
+\subsection{مؤشر التعليمة وسجل الأعلام}
+\begin{itemize}
+    \item \textbf{\textenglish{IP}} \textenglish{(Instruction Pointer)}: عنوان التعليمة القادمة داخل مقطع البرنامج.
+          هو \textenglish{CO} الذي رأيناه في الفصل الثاني. لا يمكن تغييره مباشرة بـ\code{mov}، بل بالقفز والاستدعاء.
+    \item \textbf{\textenglish{FLAGS}}: 9 بتات مستعملة من أصل 16:
+\end{itemize}
+
+\begin{center}
+\begin{tikzpicture}[b/.style={draw=brandDark, minimum width=0.75cm, minimum height=0.7cm, font=\codefont\scriptsize\bfseries}]
+    \foreach \n [count=\i from 0] in {{}, {}, {}, {}, OF, DF, IF, TF, SF, ZF, {}, AF, {}, PF, {}, CF} {
+        \pgfmathtruncatemacro\bit{15-\i}
+        \node[b, fill=brandTeal!15] at (0.75*\i, 0) {\textenglish{\n}};
+        \node[font=\codefont\tiny] at (0.75*\i, 0.55) {\textenglish{\bit}};
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|c|R||c|R|}
+    \hline
+    \ras{العلم} & \ras{المعنى} & \ras{العلم} & \ras{المعنى} \\ \hline
+    \textenglish{CF} & حمل أو استلاف خارج من آخر بت & \textenglish{OF} & فيضان: نتيجة خاطئة للأعداد بإشارة \\ \hline
+    \textenglish{PF} & عدد الآحاد في البايت الأول زوجي & \textenglish{DF} & اتجاه السلاسل (0: تصاعدي) \\ \hline
+    \textenglish{AF} & حمل من البت 3 إلى البت 4 & \textenglish{IF} & السماح بالمقاطعات العتادية \\ \hline
+    \textenglish{ZF} & النتيجة صفر & \textenglish{TF} & التنفيذ خطوة بخطوة (للتصحيح) \\ \hline
+    \textenglish{SF} & النتيجة سالبة (البت الأخير 1) & & \\ \hline
+\end{tabularx}
+\end{center}
+
+%================================================
+\section{العنونة المقطعية}
+%================================================
+
+\subsection{المشكلة}
+سجلات \textenglish{8086} من 16 بتًا، فهي تستطيع كتابة عناوين من 0 إلى $2^{16} - 1 = 65535$ فقط
+(أي \textenglish{64 KB}). لكن حافلة العناوين من 20 بتًا (\textenglish{1 MB}). كيف نكتب عنوانًا من 20 بتًا
+بسجلات من 16 بتًا؟
+
+\subsection{الحل: المقطع والإزاحة}
+نستعمل \textbf{سجلين}: سجل \textbf{المقطع} يحدد بداية منطقة من الذاكرة، و\textbf{الإزاحة}
+\textenglish{(offset)} تحدد المسافة داخل هذه المنطقة. نكتب العنوان المنطقي هكذا:
+\textenglish{segment:offset}.
+
+\begin{tarif}
+    \centering
+    $\text{العنوان الفيزيائي} = \text{المقطع} \times 16 + \text{الإزاحة}$
+    \par\small
+    الضرب في 16 = إضافة صفر واحد على اليمين في الست عشري.
+\end{tarif}
+
+\begin{khatwa}[: العنوان الفيزيائي لـ \textenglish{CS = 1000H} و\textenglish{IP = 0234H}]
+    \begin{enumerate}
+        \item نضرب المقطع في 16 (نضيف صفرًا): \hex{1000} يصبح \hex{10000}.
+        \item نضيف الإزاحة:
+        \begin{center}
+        \textenglish{\codefont
+        \begin{tabular}{r}
+              10000 \\
+            + \ 0234 \\ \hline
+              10234
+        \end{tabular}}
+        \end{center}
+        \item العنوان الفيزيائي هو \hex{10234}، وهو عنوان من 20 بتًا (5 أرقام ست عشرية).
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{لماذا نضرب في 16؟}
+لو استعملنا المقطع كما هو (دون ضرب)، لما تجاوزنا العنوان $\hex{FFFF} + \hex{FFFF} = \hex{1FFFE}$، أي
+حوالي \textenglish{128 KB} فقط. بالضرب في 16، يصبح المقطع قادرًا على الإشارة إلى أي مكان في \textenglish{1 MB}:
+$\hex{FFFF} \times 16 = \hex{FFFF0}$. ولهذا يبدأ كل مقطع دائمًا عند عنوان يقبل القسمة على 16، ويسمى
+هذا الجزء من 16 بايتًا \mustalah{فقرة}{Paragraphe}{Paragraph}.
+
+\begin{khatwa}[: ما المنطقة التي يغطيها المقطع \textenglish{DS = 2000H}؟]
+    \begin{enumerate}
+        \item أصغر إزاحة هي \hex{0000}: $\hex{20000} + \hex{0000} = \hex{20000}$.
+        \item أكبر إزاحة هي \hex{FFFF}: $\hex{20000} + \hex{FFFF} = \hex{2FFFF}$.
+        \item المقطع يغطي المنطقة من \hex{20000} إلى \hex{2FFFF}، أي $2^{16} = 65536$ بايتًا = \textenglish{64 KB}.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{tashbih}
+    تخيّل مدينة فيها شوارع كثيرة. العنوان الكامل لبيت هو «\textbf{الشارع} رقم 12، \textbf{المنزل} رقم 34».
+    سجل المقطع هو رقم الشارع (يحدد بداية منطقة)، والإزاحة هي رقم المنزل داخل الشارع. ساعي البريد يحتاج
+    المعلومتين معًا ليجد البيت.
+\end{tashbih}
+
+\begin{center}
+\begin{tikzpicture}
+    \draw[thick, fill=brandLight] (0,0) rectangle (2.5,-7);
+    \node[font=\small\bfseries] at (1.25,0.35) {الذاكرة \textenglish{(1 MB)}};
+    \node[font=\codefont\scriptsize, anchor=west] at (2.6,-0.1) {\textenglish{00000}};
+    \node[font=\codefont\scriptsize, anchor=west] at (2.6,-6.9) {\textenglish{FFFFF}};
+    \fill[brandTeal!30] (0,-2) rectangle (2.5,-4.5);
+    \draw[thick] (0,-2) rectangle (2.5,-4.5);
+    \node[font=\small] at (1.25,-3.4) {المقطع \textenglish{(64 KB)}};
+    \draw[sahmO] (-1.5,-2) node[left, font=\small] {بداية المقطع: \textenglish{10000}} -- (0,-2);
+    \draw[sahmT] (-1.5,-2.8) node[left, font=\small] {العنوان \textenglish{10234}} -- (0,-2.8);
+    \draw[decorate, decoration={brace, amplitude=5pt}, thick] (2.6,-2) -- (2.6,-2.8)
+        node[midway, right=6pt, font=\small] {الإزاحة \textenglish{0234}};
+\end{tikzpicture}
+\end{center}
+
+\begin{intabih}
+    عنوان فيزيائي واحد يمكن كتابته بعدة طرق: \textenglish{1000:0234} و\textenglish{1023:0004} يعطيان
+    العنوان نفسه \hex{10234}. تحقق بنفسك: $\hex{10230} + \hex{0004} = \hex{10234}$.
+\end{intabih}
+
+\subsection{الأزواج الافتراضية}
+كل سجل إزاحة يُستعمل افتراضيًا مع سجل مقطع معين:
+
+\begin{center}
+\begin{tabular}{|c|c|l|}
+    \hline
+    \ras{الإزاحة} & \ras{المقطع الافتراضي} & \ras{الاستعمال} \\ \hline
+    \textenglish{IP} & \textenglish{CS} & جلب التعليمات \\ \hline
+    \textenglish{SP}، \textenglish{BP} & \textenglish{SS} & المكدس \\ \hline
+    \textenglish{BX}، \textenglish{SI}، عنوان مباشر & \textenglish{DS} & المتغيرات \\ \hline
+    \textenglish{DI} (في تعليمات السلاسل) & \textenglish{ES} & وجهة النسخ \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{hal}
+    في برامج \textenglish{.COM} التي نكتبها في هذا الفصل، تكون المقاطع الأربعة \textenglish{CS = DS = SS = ES}
+    متساوية: البرنامج كله داخل مقطع واحد من \textenglish{64 KB}، ويبدأ عند الإزاحة \hex{100}. هذا
+    معنى السطر \code{org 100h} الذي سنجده في كل برامجنا.
+\end{hal}
+
+%================================================
+\section{أنماط العنونة في \textenglish{8086}}
+%================================================
+
+\begin{tarif}
+    \mustalah{العنوان الفعلي}{Adresse effective, EA}{Effective Address}: الإزاحة التي يحسبها
+    المعالج لمعامل في الذاكرة. ثم يحسب العنوان الفيزيائي $= \text{DS} \times 16 + \text{EA}$.
+\end{tarif}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{2.6cm}|>{\centering\arraybackslash}p{3.4cm}|R|}
+    \hline
+    \ras{النمط} & \ras{مثال} & \ras{العنوان الفعلي \textenglish{EA}} \\ \hline
+    فوري & \code{mov ax, 5} & لا يوجد: القيمة في التعليمة \\ \hline
+    سجلي & \code{mov ax, bx} & لا يوجد: القيمة في سجل \\ \hline
+    مباشر & \code{mov ax, [0200h]} & \textenglish{EA} = \hex{0200} \\ \hline
+    غير مباشر بسجل & \code{mov ax, [bx]} & \textenglish{EA} = \textenglish{BX} (أو \textenglish{SI}، \textenglish{DI}، \textenglish{BP}) \\ \hline
+    قاعدي & \code{mov ax, [bx+4]} & \textenglish{EA} = \textenglish{BX} + 4 \\ \hline
+    مفهرس & \code{mov ax, [si+4]} & \textenglish{EA} = \textenglish{SI} + 4 \\ \hline
+    قاعدي مفهرس & \code{mov ax, [bx+si+4]} & \textenglish{EA} = \textenglish{BX} + \textenglish{SI} + 4 \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{khatwa}[: أين يقرأ \code{mov ax, [bx+si+4]}؟]
+    نفترض: \textenglish{DS = \hex{2000}}، \textenglish{BX = \hex{0100}}، \textenglish{SI = \hex{0020}}.
+    \begin{enumerate}
+        \item العنوان الفعلي: $\text{EA} = \hex{0100} + \hex{0020} + 4 = \hex{0124}$.
+        \item العنوان الفيزيائي: $\hex{2000} \times 16 + \hex{0124} = \hex{20000} + \hex{0124} = \hex{20124}$.
+        \item يقرأ المعالج كلمة (بايتين): البايت في \hex{20124} يذهب إلى \textenglish{AL}، والبايت في
+              \hex{20125} يذهب إلى \textenglish{AH}.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{khatwa}[: \code{mov ax, [bp+2]} يستعمل المقطع \textenglish{SS}]
+    نفترض \textenglish{SS = \hex{3000}} و\textenglish{BP = \hex{FFF0}}.
+    \begin{enumerate}
+        \item العنوان الفعلي: $\text{EA} = \hex{FFF0} + 2 = \hex{FFF2}$.
+        \item بما أننا استعملنا \textenglish{BP}، فالمقطع الافتراضي هو \textenglish{SS} وليس \textenglish{DS}.
+        \item العنوان الفيزيائي: $\hex{30000} + \hex{FFF2} = \hex{3FFF2}$.
+    \end{enumerate}
+    هذا مهم في الإجراءات: \textenglish{BP} يُستعمل لقراءة المعاملات الموجودة في المكدس.
+\end{khatwa}
+
+\begin{intabih}
+    المعالج \textenglish{8086} يحفظ الكلمة في الذاكرة بترتيب \textbf{البايت الصغير أولًا}
+    \textenglish{(little endian)}: الكلمة \hex{1234} تُخزن \textenglish{34} ثم \textenglish{12}. لا يُسمح أيضًا
+    بمعاملين في الذاكرة في التعليمة نفسها: \code{mov [a], [b]} خطأ.
+\end{intabih}
+
+%================================================
+\section{أول برنامج}
+%================================================
+
+\subsection{الأدوات}
+نكتب البرنامج في \textbf{\textenglish{EMU8086}}: \textenglish{File $\rightarrow$ New $\rightarrow$}
+\textenglish{COM template}، ثم نضغط \textenglish{Emulate} وننفذ تعليمة بتعليمة بالزر \textenglish{Single step}.
+
+يمر كل برنامج بلغة التجميع بثلاث مراحل:
+\begin{center}
+\begin{tikzpicture}[node distance=1.1cm]
+    \node[unit=brandTeal, minimum width=2.8cm] (src) {الملف المصدر\\\code{hello.asm}};
+    \node[unit=brandOrange, minimum width=2.8cm, left=of src] (bin) {الملف التنفيذي\\\code{hello.com}};
+    \node[unit=brandGreen, minimum width=2.8cm, left=of bin] (run) {التنفيذ\\في الذاكرة};
+    \draw[sahmT] (src) -- node[above, font=\scriptsize] {المجمِّع} (bin);
+    \draw[sahmT] (bin) -- node[above, font=\scriptsize] {التحميل} (run);
+\end{tikzpicture}
+\end{center}
+\begin{enumerate}
+    \item \textbf{الكتابة}: نكتب التعليمات في ملف نصي (المصدر).
+    \item \textbf{التجميع}: المجمِّع يحوّل كل تعليمة إلى بايتات لغة الآلة، ويحسب عناوين المتغيرات والتسميات.
+    \item \textbf{التحميل والتنفيذ}: النظام ينسخ البايتات في الذاكرة ابتداءً من الإزاحة \hex{100}، ويضع
+          \textenglish{IP = \hex{100}}، فيبدأ المعالج التنفيذ.
+\end{enumerate}
+
+\subsection{البرنامج}
+\asm{ch3/hello.asm}
+\screen{ch3/hello.out}
+
+\begin{sharh}
+    \s{1}{تعليق: كل ما بعد \code{;} لا ينفذه المعالج، هو شرح للقارئ.}
+    \s{2}{\code{org 100h}: البرنامج من نوع \textenglish{.COM} يبدأ عند الإزاحة \hex{100}.}
+    \s{4}{نضع في \textenglish{DX} عنوان الرسالة \code{msg}.}
+    \s{5}{نختار وظيفة نظام \textenglish{DOS} رقم \hex{09}: «اكتب السلسلة الموجودة في \textenglish{DX}».}
+    \s{6}{\code{int 21h}: نطلب من \textenglish{DOS} تنفيذ الوظيفة المختارة في \textenglish{AH}.}
+    \s{7}{\code{ret}: نهاية البرنامج والعودة إلى النظام.}
+    \s{9}{نعرّف المتغير \code{msg} بـ\code{db} (\textenglish{define byte}). العلامة \code{\$} تعني نهاية النص.}
+\end{sharh}
+
+\begin{intabih}
+    نضع المعطيات \textbf{بعد} \code{ret}. لو وضعناها قبل التعليمات، لحاول المعالج تنفيذ حروف
+    الرسالة كأنها تعليمات!
+\end{intabih}
+
+\begin{khatwa}[: البرنامج في الذاكرة بعد التحميل]
+    هذه هي البايتات الحقيقية التي أنتجها المجمِّع:
+    \begin{center}
+    \small
+    \begin{tabular}{|c|l|l|}
+        \hline \ras{الإزاحة} & \ras{البايتات} & \ras{المحتوى} \\ \hline
+        \textenglish{0100} & \textenglish{\codefont 8D 16 09 01} & \code{lea dx, msg} (العنوان \hex{0109}) \\ \hline
+        \textenglish{0104} & \textenglish{\codefont B4 09} & \code{mov ah, 09h} \\ \hline
+        \textenglish{0106} & \textenglish{\codefont CD 21} & \code{int 21h} \\ \hline
+        \textenglish{0108} & \textenglish{\codefont C3} & \code{ret} \\ \hline
+        \textenglish{0109} & \textenglish{\codefont 53 61 6C 61 6D \dots} & الحروف \code{S a l a m \dots} \\ \hline
+    \end{tabular}
+    \end{center}
+    البرنامج كله 9 بايتات من التعليمات، والرسالة تبدأ مباشرة بعدها في \hex{0109}. لاحظ أن المجمِّع حسب
+    عنوان \code{msg} بنفسه ووضعه داخل تعليمة \code{lea}.
+\end{khatwa}
+
+\subsection{التعريف بالمتغيرات}
+\begin{center}
+\begin{tabular}{|l|l|}
+    \hline
+    \ras{الكتابة} & \ras{المعنى} \\ \hline
+    \code{x db 5} & بايت واحد قيمته 5 \\ \hline
+    \code{y dw 1234h} & كلمة (بايتان) قيمتها \hex{1234} \\ \hline
+    \code{t db 14, 3, 27} & جدول من 3 بايتات \\ \hline
+    \code{buf db 10 dup(0)} & 10 بايتات كلها 0 \\ \hline
+    \code{s db 'Hi\$'} & سلسلة حروف \\ \hline
+\end{tabular}
+\end{center}
+
+%================================================
+\section{مراحل تنفيذ تعليمة داخل \textenglish{8086}}
+%================================================
+
+لنتابع التعليمة \code{mov cx, [si]} من البرنامج \code{transfer.asm} (القسم الآتي). في الذاكرة،
+هذه التعليمة مكتوبة بالبايتين \textenglish{8B 0C} في الإزاحة \hex{010C}، و\textenglish{SI = \hex{0112}}.
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{1.5cm}|>{\centering\arraybackslash}p{1.2cm}|R|}
+    \hline
+    \ras{المرحلة} & \ras{الوحدة} & \ras{ما يحدث} \\ \hline
+    1 & \textenglish{BIU} & تحسب العنوان الفيزيائي $\text{CS} \times 16 + \text{IP}$، وتجلب البايتين \textenglish{8B 0C} إلى الطابور (غالبًا قبل أن نحتاجهما). \\ \hline
+    2 & \textenglish{EU} & تأخذ \textenglish{8B} من الطابور: «نقل كلمة من الذاكرة إلى سجل». ثم \textenglish{0C}: «السجل \textenglish{CX}، والعنوان في \textenglish{SI}». \textenglish{IP} يصبح \hex{010E}. \\ \hline
+    3 & \textenglish{EU} & تحسب العنوان الفعلي: \textenglish{EA = SI = \hex{0112}}. \\ \hline
+    4 & \textenglish{BIU} & تحسب $\text{DS} \times 16 + \hex{0112}$، ترسله على حافلة العناوين، مع إشارة قراءة. \\ \hline
+    5 & \textenglish{BIU} & تصل الكلمة \hex{ABCD} على حافلة المعطيات (\textenglish{CD} ثم \textenglish{AB}). \\ \hline
+    6 & \textenglish{EU} & تكتب النتيجة في \textenglish{CX}: \textenglish{CX = \hex{ABCD}}. الأعلام لا تتغير مع \code{mov}. \\ \hline
+\end{tabularx}
+\end{center}
+
+%================================================
+\section{مجموعة التعليمات بالتفصيل}
+%================================================
+
+نستعمل هذه الرموز في الجداول: \textenglish{reg} = سجل، \textenglish{mem} = خانة ذاكرة، \textenglish{imm} = قيمة فورية.
+
+\subsection{تعليمات النقل}
+\begin{center}
+\small
+\begin{tabular}{|l|l|l|}
+    \hline
+    \ras{التعليمة} & \ras{المعنى} & \ras{مثال} \\ \hline
+    \code{mov dest, src} & $\text{dest} \leftarrow \text{src}$ & \code{mov ax, bx} \\ \hline
+    \code{xchg a, b} & تبادل القيمتين & \code{xchg ax, bx} \\ \hline
+    \code{lea reg, mem} & \textenglish{reg} يأخذ عنوان المتغير & \code{lea si, tab} \\ \hline
+    \code{push src} / \code{pop dest} & وضع في المكدس / أخذ منه & \code{push ax} \\ \hline
+\end{tabular}
+\end{center}
+
+\asm{ch3/transfer.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|c|c|}
+    \hline
+    \ras{السطر} & \ras{التعليمة} & \ras{\textenglish{AX}} & \ras{\textenglish{BX}} & \ras{\textenglish{CX}} & \ras{\textenglish{SI}} \\ \hline
+    4 & \code{mov ax, 1234h} & \cell{orangeDeep}{1234} & 0000 & 0000 & 0000 \\ \hline
+    5 & \code{mov bl, ah} & 1234 & \cell{orangeDeep}{0012} & 0000 & 0000 \\ \hline
+    6 & \code{mov bh, al} & 1234 & \cell{orangeDeep}{3412} & 0000 & 0000 \\ \hline
+    7 & \code{xchg ax, bx} & \cell{orangeDeep}{3412} & \cell{orangeDeep}{1234} & 0000 & 0000 \\ \hline
+    8 & \code{lea si, num} & 3412 & 1234 & 0000 & \cell{orangeDeep}{0112} \\ \hline
+    9 & \code{mov cx, [si]} & 3412 & 1234 & \cell{orangeDeep}{ABCD} & 0112 \\ \hline
+    10 & \code{mov [res], ax} & 3412 & 1234 & ABCD & 0112 \\ \hline
+\end{tabular}
+\end{center}
+\begin{sharh}
+    \s{5--6}{ننسخ نصفي \textenglish{AX} مقلوبين في \textenglish{BX}: \textenglish{BH = 34} و\textenglish{BL = 12}.}
+    \s{8}{\code{lea} تعطي \textbf{العنوان} \hex{0112} وليس القيمة.}
+    \s{9}{نقرأ الكلمة الموجودة في العنوان \hex{0112}: \hex{ABCD}.}
+    \s{10}{السطر الوحيد الذي يكتب في الذاكرة: \code{res} تصبح \hex{3412}.}
+\end{sharh}
+
+\subsection{التعليمات الحسابية}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|l|R|l|}
+    \hline
+    \ras{التعليمة} & \ras{المعنى} & \ras{الأعلام} \\ \hline
+    \code{add d, s} & $d \leftarrow d + s$ & كلها \\ \hline
+    \code{adc d, s} & $d \leftarrow d + s + \text{CF}$ (لجمع أعداد كبيرة) & كلها \\ \hline
+    \code{sub d, s} & $d \leftarrow d - s$ & كلها \\ \hline
+    \code{inc d} & $d \leftarrow d + 1$ & كلها إلا \textenglish{CF} \\ \hline
+    \code{dec d} & $d \leftarrow d - 1$ & كلها إلا \textenglish{CF} \\ \hline
+    \code{neg d} & $d \leftarrow -d$ (المتمم لاثنين) & كلها \\ \hline
+    \code{cmp a, b} & يحسب $a - b$ \textbf{دون حفظ النتيجة} & كلها \\ \hline
+    \code{mul s} & ضرب دون إشارة (\code{imul} بإشارة) & \textenglish{CF}، \textenglish{OF} \\ \hline
+    \code{div s} & قسمة دون إشارة (\code{idiv} بإشارة) & غير محددة \\ \hline
+\end{tabularx}
+\end{center}
+
+\asm{ch3/arith.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|c|}
+    \hline
+    \ras{السطر} & \ras{التعليمة} & \ras{النتيجة} & \ras{بالعشري} & \ras{\textenglish{CF}} \\ \hline
+    4 & \code{mov al, 25} & \textenglish{AL = 19} & 25 & 0 \\ \hline
+    5 & \code{add al, 17} & \textenglish{AL = 2A} & 42 & 0 \\ \hline
+    6 & \code{sub al, 2} & \textenglish{AL = 28} & 40 & 0 \\ \hline
+    7 & \code{inc al} & \textenglish{AL = 29} & 41 & 0 \\ \hline
+    8 & \code{dec al} & \textenglish{AL = 28} & 40 & 0 \\ \hline
+    9 & \code{neg al} & \textenglish{AL = D8} & $-40$ & 1 \\ \hline
+    10 & \code{mov bx, 1000} & \textenglish{BX = 03E8} & 1000 & 1 \\ \hline
+    11 & \code{add bx, 2500} & \textenglish{BX = 0DAC} & 3500 & 0 \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: لماذا $-40$ يُكتب \hex{D8}؟ (المتمم لاثنين)]
+    \begin{enumerate}
+        \item نكتب 40 بالثنائي: \bin{0010\,1000}.
+        \item نقلب كل البتات: \bin{1101\,0111}.
+        \item نضيف 1: $\bin{1101\,1000} = \hex{D8}$.
+    \end{enumerate}
+    تحقق: $40 + (-40) = \hex{28} + \hex{D8} = \hex{100}$، وعلى 8 بتات يبقى \textenglish{00}. صحيح!
+\end{khatwa}
+
+\subsubsection{الضرب والقسمة}
+المعالج يختار المكان حسب حجم المعامل:
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|}
+    \hline
+    \ras{التعليمة} & \ras{المعامل} & \ras{العملية} & \ras{النتيجة} \\ \hline
+    \code{mul bl} & 8 بتات & $\text{AL} \times \text{BL}$ & \textenglish{AX} \\ \hline
+    \code{mul cx} & 16 بتًا & $\text{AX} \times \text{CX}$ & \textenglish{DX:AX} (32 بتًا) \\ \hline
+    \code{div bl} & 8 بتات & $\text{AX} \div \text{BL}$ & \textenglish{AL} = الحاصل، \textenglish{AH} = الباقي \\ \hline
+    \code{div cx} & 16 بتًا & $\text{DX:AX} \div \text{CX}$ & \textenglish{AX} = الحاصل، \textenglish{DX} = الباقي \\ \hline
+\end{tabular}
+\end{center}
+
+\asm{ch3/muldiv.asm}
+
+\begin{sharh}
+    \s{6}{$12 \times 11 = 132 = \hex{84}$: \textenglish{AX = \hex{0084}}.}
+    \s{10}{$300 \times 500 = 150000$، وهو أكبر من 65535، فيتوزع على سجلين:
+           \textenglish{DX = \hex{0002}} و\textenglish{AX = \hex{49F0}} (لأن $\hex{249F0} = 150000$).}
+    \s{14}{$47 = 5 \times 9 + 2$: \textenglish{AL = 09} (الحاصل) و\textenglish{AH = 02} (الباقي)، أي \textenglish{AX = \hex{0209}}.}
+\end{sharh}
+
+\begin{intabih}
+    قبل \code{div cx} يجب وضع \textenglish{DX = 0} إذا كان العدد المقسوم في \textenglish{AX} فقط، وإلا اعتبر
+    المعالج \textenglish{DX} جزءًا من العدد. والقسمة على 0 توقف البرنامج (مقاطعة رقم 0).
+\end{intabih}
+
+\subsubsection{جمع أعداد أكبر من 16 بتًا: \code{adc}}
+المعالج \textenglish{8086} يجمع 16 بتًا في المرة الواحدة. لجمع عددين من 32 بتًا، نقسم كل عدد إلى كلمتين
+(عالية ومنخفضة)، ونجمع الكلمتين المنخفضتين بـ\code{add}، ثم العاليتين بـ\code{adc} التي تضيف الحمل
+\textenglish{CF} القادم من الجمع الأول، تمامًا كما نحمل «واحدًا» إلى العمود التالي عند الجمع بالقلم.
+
+\asm{ch3/add32.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|c|}
+    \hline
+    \ras{السطر} & \ras{التعليمة} & \ras{\textenglish{DX}} & \ras{\textenglish{AX}} & \ras{\textenglish{CF}} \\ \hline
+    \textenglish{5--6} & تحميل العدد الأول & 0001 & FFFF & 0 \\ \hline
+    7 & \code{add ax, 0001h} & 0001 & \cell{orangeDeep}{0000} & \cell{orangeDeep}{\textbf{1}} \\ \hline
+    8 & \code{adc dx, 0000h} & \cell{orangeDeep}{0002} & 0000 & 0 \\ \hline
+\end{tabular}
+\end{center}
+النتيجة \textenglish{DX:AX = 0002:0000} = \hex{00020000}. لو استعملنا \code{add} في السطر 8 لضاع الحمل،
+ولحصلنا على \hex{00010000}، وهي نتيجة خاطئة.
+
+\subsection{التعليمات المنطقية}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|l|R|l|}
+    \hline
+    \ras{التعليمة} & \ras{الاستعمال المعتاد} & \ras{مثال} \\ \hline
+    \code{and} & إطفاء بتات (القناع) & \code{and al, 0Fh} \\ \hline
+    \code{or} & إشعال بتات & \code{or al, 80h} \\ \hline
+    \code{xor} & قلب بتات، أو تصفير سجل & \code{xor cx, cx} \\ \hline
+    \code{not} & قلب كل البتات & \code{not al} \\ \hline
+    \code{test} & \code{and} دون حفظ النتيجة (فحص بت) & \code{test al, 1} \\ \hline
+    \code{shl} / \code{shr} & إزاحة: ضرب أو قسمة على 2 & \code{shl bl, 1} \\ \hline
+    \code{rol} / \code{ror} & تدوير: البت الخارج يعود من الجهة الأخرى & \code{rol al, 1} \\ \hline
+\end{tabularx}
+\end{center}
+
+\asm{ch3/logic.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|}
+    \hline
+    \ras{السطر} & \ras{التعليمة} & \ras{\textenglish{AL} بالثنائي} & \ras{ست عشري} \\ \hline
+    4 & \code{mov al, 10110110b} & \textenglish{\codefont 1011 0110} & \textenglish{B6} \\ \hline
+    5 & \code{and al, 00001111b} & \textenglish{\codefont 0000 0110} & \textenglish{06} \\ \hline
+    6 & \code{or  al, 10000000b} & \textenglish{\codefont 1000 0110} & \textenglish{86} \\ \hline
+    7 & \code{xor al, 11111111b} & \textenglish{\codefont 0111 1001} & \textenglish{79} \\ \hline
+    8 & \code{not al} & \textenglish{\codefont 1000 0110} & \textenglish{86} \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{sharh}
+    \s{5}{\code{and} مع 1 يبقي البت، ومع 0 يطفئه: نحتفظ بالبتات الأربعة الأولى فقط.}
+    \s{6}{\code{or} مع 1 يشعل البت: البت 7 أصبح 1.}
+    \s{10--12}{\textenglish{BL}: $5 \rightarrow 10 \rightarrow 20 \rightarrow 10$. الإزاحة إلى اليسار تضرب في 2، وإلى اليمين تقسم على 2.}
+    \s{13}{\code{xor cx, cx}: كل بت مع نفسه يعطي 0، إذن \textenglish{CX = 0}. أسرع وأقصر من \code{mov cx, 0}.}
+\end{sharh}
+
+\subsubsection{استعمالات عملية للأقنعة}
+\begin{khatwa}[: هل العدد في \textenglish{AL} زوجي؟]
+    العدد زوجي إذا كان البت 0 يساوي 0. نكتب \code{test al, 1}: هذه التعليمة تحسب $\text{AL} \cdot 1$ دون أن تغيّر
+    \textenglish{AL}.
+    \begin{itemize}
+        \item إذا كان \textenglish{AL = 6} = \bin{0000\,0110}: البت 0 يساوي 0، النتيجة 0، و\textenglish{ZF = 1}: العدد زوجي.
+        \item إذا كان \textenglish{AL = 7} = \bin{0000\,0111}: البت 0 يساوي 1، النتيجة 1، و\textenglish{ZF = 0}: العدد فردي.
+    \end{itemize}
+    بعدها نكتب \code{jz zawji} للقفز في حالة العدد الزوجي.
+\end{khatwa}
+
+\begin{khatwa}[: تحويل حرف صغير إلى كبير بالقناع]
+    في جدول \textenglish{ASCII}: \textenglish{\code{'a'} = \hex{61} = \bin{0110\,0001}} و\textenglish{\code{'A'} = \hex{41} = \bin{0100\,0001}}.
+    الفرق الوحيد هو البت 5. إذن \code{and al, 11011111b} (أي \code{0DFh}) يطفئ البت 5 فيحوّل أي حرف صغير إلى كبير،
+    ويترك الحرف الكبير كما هو. هذه طريقة أخرى غير \code{sub al, 32} التي سنراها في قسم الإدخال.
+\end{khatwa}
+
+\subsection{التحكم في التدفق: القفزات}
+عادة ينفذ المعالج التعليمات بالترتيب. \textbf{القفز} يغيّر \textenglish{IP} فيذهب التنفيذ إلى مكان آخر.
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|l|R|l|}
+    \hline
+    \ras{التعليمة} & \ras{تقفز إذا\dots} & \ras{الأعلام} \\ \hline
+    \code{jmp L} & دائمًا (قفز غير مشروط) & -- \\ \hline
+    \code{je} / \code{jz} & متساويان / النتيجة صفر & \textenglish{ZF = 1} \\ \hline
+    \code{jne} / \code{jnz} & غير متساويين & \textenglish{ZF = 0} \\ \hline
+    \code{jg} / \code{jge} & أكبر / أكبر أو يساوي (\textbf{بإشارة}) & \textenglish{ZF}، \textenglish{SF}، \textenglish{OF} \\ \hline
+    \code{jl} / \code{jle} & أصغر / أصغر أو يساوي (\textbf{بإشارة}) & \textenglish{SF}، \textenglish{OF} \\ \hline
+    \code{ja} / \code{jae} & أكبر / أكبر أو يساوي (\textbf{دون إشارة}) & \textenglish{CF}، \textenglish{ZF} \\ \hline
+    \code{jb} / \code{jbe} & أصغر / أصغر أو يساوي (\textbf{دون إشارة}) & \textenglish{CF}، \textenglish{ZF} \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{tashbih}
+    \code{cmp} يشبه \textbf{وضع شيئين على ميزان}، والقفز المشروط يشبه قولك: «\textbf{إذا} مالت الكفة اليمنى
+    فاذهب إلى اليمين». الميزان (\code{cmp}) يضبط الأعلام، والقفز ينظر إليها.
+\end{tashbih}
+
+\subsubsection{مثال: إذا \dots وإلا}
+\asm{ch3/ifelse.asm}
+\screen{ch3/ifelse.out}
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.6cm]
+    \node[unit] (c) {\code{cmp al, [b]}};
+    \node[diamond, aspect=2.2, draw=brandOrange, fill=brandOrange!15, thick, below=of c, font=\small] (q) {$a > b$؟};
+    \node[unit=brandGreen, below right=0.4cm and 0.6cm of q] (y) {\code{lea dx, msg1}};
+    \node[unit=brandPurple, below left=0.4cm and 0.6cm of q] (n) {\code{lea dx, msg2}};
+    \node[unit, below=1.8cm of q] (p) {\code{int 21h} (الطباعة)};
+    \draw[sahm] (c) -- (q);
+    \draw[sahm] (q) -| node[pos=0.2, above, font=\small] {نعم: \code{jg first}} (y);
+    \draw[sahm] (q) -| node[pos=0.2, above, font=\small] {لا} (n);
+    \draw[sahm] (y) |- (p);
+    \draw[sahm] (n) |- node[pos=0.7, below, font=\small] {\code{jmp show}} (p);
+\end{tikzpicture}
+\end{center}
+
+\begin{sharh}
+    \s{5}{\code{cmp} يحسب $7 - 12 = -5$ ولا يحفظه، لكنه يضبط الأعلام (\textenglish{SF = 1}).}
+    \s{6}{\code{jg}: هل $a > b$؟ لا، فلا نقفز ونكمل في السطر 7.}
+    \s{7--8}{نختار الرسالة الثانية، ثم \code{jmp show} \textbf{ضروري} لكي لا ننفذ السطر 10.}
+    \s{12--13}{الطباعة مشتركة بين الحالتين.}
+\end{sharh}
+
+\begin{intabih}
+    ننسى كثيرًا \code{jmp show} في السطر 8! بدونه ينفذ البرنامج \code{lea dx, msg1} أيضًا،
+    فيطبع دائمًا الرسالة الأولى.
+\end{intabih}
+
+\subsubsection{بإشارة أم دون إشارة؟ \code{jg} أو \code{ja}}
+البتات نفسها يمكن قراءتها بطريقتين (رأينا ذلك في الفصل الثاني). \textenglish{AL = \hex{C8}} يساوي 200 دون إشارة،
+ويساوي $-56$ بإشارة. لذلك يملك المعالج نوعين من القفزات: \code{ja}/\code{jb} للأعداد دون إشارة،
+و\code{jg}/\code{jl} للأعداد بإشارة.
+
+\asm{ch3/signed.asm}
+\screen{ch3/signed.out}
+
+\begin{sharh}
+    \s{4--6}{\code{ja}: نقارن 200 مع 100 كأعداد موجبة. $200 > 100$، فنقفز.}
+    \s{14--16}{\code{jg}: البتات نفسها \hex{C8}، لكن نقرؤها بإشارة: $-56 > 100$؟ لا، فلا نقفز.}
+\end{sharh}
+
+\begin{intabih}
+    اختر القفزة حسب \textbf{نوع المعطيات}: الأعمار، العناوين، رموز الحروف، الأحجام: دون إشارة (\code{ja}، \code{jb}).
+    درجات الحرارة، الأرصدة، الفروق: بإشارة (\code{jg}، \code{jl}).
+\end{intabih}
+
+\subsubsection{من الخوارزمية إلى لغة التجميع}
+كل بنية تحكم تعلمناها في مقياس الخوارزميات لها «ترجمة» ثابتة في لغة التجميع. الفكرة دائمًا هي نفسها:
+\textbf{نقارن} بـ\code{cmp}، ثم \textbf{نقفز} حسب النتيجة.
+
+\newcommand{\stk}[1]{\begin{tabular}[t]{@{}l@{}}#1\end{tabular}}
+\begin{center}
+\small
+\begin{tabular}{|l|l|l|}
+    \hline
+    \ras{البنية} & \ras{بلغة \textenglish{C}} & \ras{بلغة التجميع} \\ \hline
+    إذا & \code{if (a == b) x = 1;} &
+        \stk{\code{    cmp a, b}\\ \code{    jne end}\\ \code{    mov x, 1}\\ \code{end:}} \\ \hline
+    طالما & \code{while (cx > 0) \{ ... \}} &
+        \stk{\code{L:  cmp cx, 0}\\ \code{    jle end}\\ \code{    ...}\\ \code{    jmp L}\\ \code{end:}} \\ \hline
+    من أجل & \code{for (cx = 10; cx > 0; cx--)} &
+        \stk{\code{    mov cx, 10}\\ \code{L:  ...}\\ \code{    loop L}} \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{intabih}
+    لاحظ في ترجمة \code{if}: نقفز بالشرط \textbf{المعاكس} (\code{jne} بدل \code{je}). نقول للمعالج: «إذا
+    لم يكونا متساويين، تجاوز تعليمة الإسناد». هذه الطريقة تجعل البرنامج أقصر.
+\end{intabih}
+
+\subsection{الحلقات والتكرار}
+\begin{tarif}
+    \code{loop L} تساوي تعليمتين: \code{dec cx} ثم «إذا كان \textenglish{CX} $\neq 0$ فاقفز إلى \textenglish{L}».
+    إذن \textenglish{CX} هو عدّاد الحلقة.
+\end{tarif}
+
+\subsubsection{مجموع الأعداد من 1 إلى 10}
+\asm{ch3/loopsum.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|}
+    \hline
+    \ras{الدورة} & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 \\ \hline
+    \ras{\textenglish{CX} قبل \code{add}} & 10 & 9 & 8 & 7 & 6 & 5 & 4 & 3 & 2 & 1 \\ \hline
+    \ras{\textenglish{AX} بعد \code{add}} & 10 & 19 & 27 & 34 & 40 & 45 & 49 & 52 & 54 & \cell{orangeDeep}{\textbf{55}} \\ \hline
+\end{tabular}
+\end{center}
+بعد الدورة العاشرة يصبح \textenglish{CX = 0} فتتوقف الحلقة، و\textenglish{AX = \hex{0037} = 55}.
+لاحظ أننا نجمع بالعكس: $10 + 9 + \dots + 1$، والنتيجة نفسها.
+
+\begin{intabih}
+    إذا دخلنا الحلقة و\textenglish{CX = 0}، فإن \code{loop} تنقص \textenglish{CX} أولًا فيصبح \hex{FFFF}، ثم تكرر
+    65535 مرة أخرى! لتجنب ذلك نضع قبل الحلقة \code{jcxz fin}: «إذا كان \textenglish{CX = 0} فاقفز إلى النهاية».
+\end{intabih}
+
+\subsubsection{البحث عن أكبر قيمة في جدول}
+\asm{ch3/maxarray.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|c|}
+    \hline
+    \ras{\textenglish{SI} يشير إلى} & \ras{العنصر} & \ras{العنصر $>$ \textenglish{AL}؟} & \ras{\textenglish{AL} بعدها} & \ras{\textenglish{CX} بعد \code{loop}} \\ \hline
+    \textenglish{tab[0]} & 14 & لا (يساويه) & 14 & 5 \\ \hline
+    \textenglish{tab[1]} & 3 & لا & 14 & 4 \\ \hline
+    \textenglish{tab[2]} & 27 & نعم & 27 & 3 \\ \hline
+    \textenglish{tab[3]} & 9 & لا & 27 & 2 \\ \hline
+    \textenglish{tab[4]} & 31 & نعم & \cell{orangeDeep}{\textbf{31}} & 1 \\ \hline
+    \textenglish{tab[5]} & 8 & لا & 31 & 0 \\ \hline
+\end{tabular}
+\end{center}
+النتيجة: \textenglish{AL = \hex{1F} = 31}، وتُحفظ في \code{max}. استعملنا \code{jbe} لأن القيم
+\textbf{دون إشارة}.
+
+\subsubsection{التكرار بالبادئة \code{rep}}
+تعليمات السلاسل تعمل على \textenglish{DS:SI} (المصدر) و\textenglish{ES:DI} (الوجهة)، والبادئة \code{rep}
+تكررها \textenglish{CX} مرة.
+
+\asm{ch3/repmovs.asm}
+\screen{ch3/repmovs.out}
+
+\begin{sharh}
+    \s{7}{\code{cld}: نجعل \textenglish{DF = 0}، فيزيد \textenglish{SI} و\textenglish{DI} بعد كل نسخ.}
+    \s{8}{\code{rep movsb} تنسخ بايتًا من \textenglish{[SI]} إلى \textenglish{[DI]}، وتكرر 6 مرات: الحروف الخمسة و\code{\$}.}
+\end{sharh}
+
+\subsection{توليد لغة الآلة}
+المجمِّع يحوّل كل تعليمة إلى بايتات. هذه البايتات الحقيقية للبرنامج \code{machine.asm}:
+
+\asm{ch3/machine.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|l|}
+    \hline
+    \ras{العنوان} & \ras{لغة الآلة (ست عشري)} & \ras{التعليمة} \\ \hline
+    \textenglish{0100} & \textenglish{\codefont B8 34 12} & \code{mov ax, 1234h} \\ \hline
+    \textenglish{0103} & \textenglish{\codefont 89 C3} & \code{mov bx, ax} \\ \hline
+    \textenglish{0105} & \textenglish{\codefont 04 05} & \code{add al, 5} \\ \hline
+    \textenglish{0107} & \textenglish{\codefont 88 07} & \code{mov [bx], al} \\ \hline
+    \textenglish{0109} & \textenglish{\codefont 41} & \code{inc cx} \\ \hline
+    \textenglish{010A} & \textenglish{\codefont EB 01} & \code{jmp fin} \\ \hline
+    \textenglish{010C} & \textenglish{\codefont 90} & \code{nop} \\ \hline
+    \textenglish{010D} & \textenglish{\codefont C3} & \code{ret} \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: فك ترميز \textenglish{B8 34 12}]
+    \begin{enumerate}
+        \item \textenglish{B8} = \bin{1011\,1000}: الخمسة بتات الأولى \textenglish{10111} تعني «\code{mov} قيمة فورية في سجل 16 بتًا»،
+              والبتات الثلاثة الأخيرة \textenglish{000} = رقم السجل \textenglish{AX}.
+        \item \textenglish{34 12}: القيمة \hex{1234} مكتوبة بالبايت الصغير أولًا \textenglish{(little endian)}.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{khatwa}[: فك ترميز \textenglish{89 C3} (\code{mov bx, ax})]
+    البايت الأول \textenglish{89} = \bin{100010\,0\,1}:
+    \begin{itemize}
+        \item \textenglish{100010}: الرمز العملي لـ\code{mov} بين سجل وسجل أو ذاكرة.
+        \item \textenglish{d = 0}: السجل المذكور في الحقل \textenglish{reg} هو \textbf{المصدر}.
+        \item \textenglish{w = 1}: نعمل على 16 بتًا (لو كان 0 لعملنا على 8 بتات).
+    \end{itemize}
+    البايت الثاني \textenglish{C3} = \bin{11\,000\,011}، ويسمى \textenglish{ModR/M}:
+    \begin{center}
+    \begin{tikzpicture}[f/.style={draw=brandDark, thick, minimum height=0.7cm, font=\codefont\bfseries}]
+        \node[f, minimum width=1.6cm, fill=brandOrange!20] (m) at (0,0) {\textenglish{11}};
+        \node[f, minimum width=2.2cm, fill=brandTeal!20, anchor=west] (r) at (m.east) {\textenglish{000}};
+        \node[f, minimum width=2.2cm, fill=brandGreen!20, anchor=west] (rm) at (r.east) {\textenglish{011}};
+        \node[below=0.1cm of m, font=\small] {\textenglish{mod}: سجل};
+        \node[below=0.1cm of r, font=\small] {\textenglish{reg} = \textenglish{AX}};
+        \node[below=0.1cm of rm, font=\small] {\textenglish{r/m} = \textenglish{BX}};
+    \end{tikzpicture}
+    \end{center}
+    إذن: انقل \textenglish{AX} (المصدر) إلى \textenglish{BX}.
+\end{khatwa}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+    \hline
+    \ras{الرقم} & 000 & 001 & 010 & 011 & 100 & 101 & 110 & 111 \\ \hline
+    \ras{\textenglish{w = 1}} & \textenglish{AX} & \textenglish{CX} & \textenglish{DX} & \textenglish{BX} & \textenglish{SP} & \textenglish{BP} & \textenglish{SI} & \textenglish{DI} \\ \hline
+    \ras{\textenglish{w = 0}} & \textenglish{AL} & \textenglish{CL} & \textenglish{DL} & \textenglish{BL} & \textenglish{AH} & \textenglish{CH} & \textenglish{DH} & \textenglish{BH} \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{mithal}[: \textenglish{88 07} و\textenglish{EB 01}]
+    \textenglish{88} = \bin{100010\,0\,0}: \code{mov} على 8 بتات. \textenglish{07} = \bin{00\,000\,111}:
+    \textenglish{mod = 00} (ذاكرة دون إزاحة)، \textenglish{reg = 000} (\textenglish{AL})، \textenglish{r/m = 111} (\textenglish{[BX]}).
+    إذن \code{mov [bx], al}.\\[3pt]
+    \textenglish{EB 01}: قفز قصير، والإزاحة \textbf{نسبية}: بعد قراءة \code{jmp} يكون \textenglish{IP = \hex{010C}}،
+    ونضيف 1 فنصل إلى \hex{010D} (\code{fin}). هكذا قفزنا فوق \code{nop}.
+\end{mithal}
+
+%================================================
+\section{إدارة الإدخال والإخراج}
+%================================================
+
+\subsection{المنافذ: \code{in} و\code{out}}
+يتصل المعالج بالأجهزة عبر \mustalah{منافذ}{Ports}{I/O ports} مرقمة من 0 إلى \hex{FFFF}.
+\begin{itemize}
+    \item \code{in al, 60h}: اقرأ بايتًا من المنفذ \hex{60} (لوحة المفاتيح في الحاسوب الشخصي).
+    \item \code{out 61h, al}: أرسل \textenglish{AL} إلى المنفذ \hex{61} (مكبر الصوت).
+\end{itemize}
+البرامج العادية نادرًا ما تستعمل المنافذ مباشرة، بل تطلب ذلك من نظام التشغيل عبر المقاطعات.
+
+\subsection{خدمات \textenglish{DOS}: المقاطعة \code{int 21h}}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|c|R|R|}
+    \hline
+    \ras{\textenglish{AH}} & \ras{الوظيفة} & \ras{المدخلات والمخرجات} \\ \hline
+    \hex{01} & قراءة حرف من لوحة المفاتيح مع إظهاره & المخرج: الحرف في \textenglish{AL} \\ \hline
+    \hex{02} & كتابة حرف & المدخل: الحرف في \textenglish{DL} \\ \hline
+    \hex{09} & كتابة سلسلة تنتهي بـ\code{\$} & المدخل: عنوانها في \textenglish{DX} \\ \hline
+    \hex{4C} & إنهاء البرنامج & \textenglish{AL} = رمز النهاية \\ \hline
+\end{tabularx}
+\end{center}
+
+\asm{ch3/io.asm}
+\screen{ch3/io.out}
+
+\begin{sharh}
+    \s{7--8}{ننتظر أن يضغط المستعمل حرفًا (هنا \code{m})، فيصل رمزه \textenglish{ASCII} في \textenglish{AL}: 109.}
+    \s{9}{في جدول \textenglish{ASCII}، الحرف الكبير أصغر من الصغير بـ32: $109 - 32 = 77$، وهو رمز \code{'M'}.}
+    \s{10}{نحفظ الحرف في \textenglish{BL}، لأن الطباعة في السطر 13 ستغيّر \textenglish{AL}.}
+    \s{14--16}{الوظيفة \hex{02} تكتب الحرف الموجود في \textenglish{DL}.}
+    \s{20}{\code{13, 10}: الرجوع إلى بداية السطر ثم سطر جديد.}
+\end{sharh}
+
+%================================================
+\section{إدارة المكدس}
+%================================================
+
+\begin{tarif}
+    \mustalah{المكدس}{Pile}{Stack}: منطقة من الذاكرة نضع فيها القيم ونأخذها بقاعدة
+    \textbf{آخر من يدخل أول من يخرج} \textenglish{(LIFO: Last In, First Out)}. قمته محددة بـ\textenglish{SS:SP}.
+\end{tarif}
+
+\begin{tashbih}
+    المكدس مثل \textbf{كومة صحون}: نضع الصحن الجديد فوق الكومة، ونأخذ دائمًا الصحن الذي في الأعلى.
+\end{tashbih}
+
+\begin{itemize}
+    \item \code{push ax}: \nql{SP}{SP - 2}، ثم نكتب \textenglish{AX} في \textenglish{[SP]}.
+    \item \code{pop ax}: نقرأ \textenglish{[SP]} في \textenglish{AX}، ثم \nql{SP}{SP + 2}.
+\end{itemize}
+
+\begin{intabih}
+    في \textenglish{8086} المكدس \textbf{ينمو نحو العناوين الصغيرة}: كل \code{push} ينقص \textenglish{SP}.
+    ونضع ونأخذ دائمًا \textbf{كلمات} (16 بتًا).
+\end{intabih}
+
+\asm{ch3/stack.asm}
+
+\begin{center}
+\begin{tikzpicture}[c/.style={draw=brandDark, fill=white, minimum width=1.6cm, minimum height=0.55cm, font=\codefont\small},
+    a/.style={font=\codefont\scriptsize, lawn=tealDeep}]
+    \foreach \t/\x/\v/\w/\sp in {{البداية}/0/{}/{}/FFFE, {بعد \code{push ax}}/3.3/1111/{}/FFFC,
+                                {بعد \code{push bx}}/6.6/1111/2222/FFFA, {بعد \code{pop ax}}/9.9/1111/{}/FFFC} {
+        \node[font=\small\bfseries] at (\x,1.1) {\t};
+        \node[c] (u) at (\x,0.3) {\textenglish{\v}};
+        \node[c] (d) at (\x,-0.25) {\textenglish{\w}};
+        \node[a, left=0.05cm of u] {\textenglish{FFFC}};
+        \node[a, left=0.05cm of d] {\textenglish{FFFA}};
+        \node[font=\codefont\small] at (\x,-1) {\textenglish{SP = \sp}};
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|c|}
+    \hline
+    \ras{السطر} & \ras{التعليمة} & \ras{\textenglish{AX}} & \ras{\textenglish{BX}} & \ras{\textenglish{SP}} \\ \hline
+    \textenglish{4--5} & \code{mov ax/bx} & 1111 & 2222 & FFFE \\ \hline
+    6 & \code{push ax} & 1111 & 2222 & \cell{orangeDeep}{FFFC} \\ \hline
+    7 & \code{push bx} & 1111 & 2222 & \cell{orangeDeep}{FFFA} \\ \hline
+    8 & \code{pop ax} & \cell{orangeDeep}{2222} & 2222 & FFFC \\ \hline
+    9 & \code{pop bx} & 2222 & \cell{orangeDeep}{1111} & FFFE \\ \hline
+\end{tabular}
+\end{center}
+بما أن آخر قيمة دخلت (\hex{2222}) هي أول قيمة خرجت، فقد تبادل \textenglish{AX} و\textenglish{BX} قيمتيهما.
+
+\subsection{لماذا نحتاج إلى المكدس؟}
+\begin{enumerate}
+    \item \textbf{حفظ عناوين العودة}: عندما نستدعي إجراء، يحفظ المعالج في المكدس أين يجب أن يعود.
+    \item \textbf{حفظ السجلات مؤقتًا}: إجراء يحتاج إلى \textenglish{CX} وهو مستعمل في حلقة؟ نكتب \code{push cx}
+          في بدايته و\code{pop cx} في نهايته، فلا يضيع عدّاد الحلقة.
+    \item \textbf{تمرير المعاملات} إلى الإجراءات (سنراه بعد قليل).
+    \item \textbf{المقاطعات}: المعالج يحفظ فيه حالته قبل أن يذهب إلى معالج المقاطعة.
+\end{enumerate}
+
+\begin{intabih}
+    يجب أن يكون عدد \code{pop} مساويًا لعدد \code{push}، وبالترتيب المعاكس. \code{push ax} ثم \code{push bx}
+    يجب أن يقابلهما \code{pop bx} ثم \code{pop ax}. إذا نسيت \code{pop} واحدًا داخل إجراء، فإن \code{ret} ستأخذ
+    قيمة خاطئة كعنوان عودة، فيقفز البرنامج إلى مكان عشوائي.
+\end{intabih}
+
+%================================================
+\section{الدوال والإجراءات}
+%================================================
+
+\begin{tarif}
+    \mustalah{الإجراء}{Procédure, sous-programme}{Procedure}: مجموعة تعليمات لها اسم، نستدعيها بـ\code{call}
+    ونعود منها بـ\code{ret}. نكتبها مرة واحدة ونستعملها عدة مرات.
+\end{tarif}
+
+\subsection{كيف يعرف \code{ret} إلى أين يعود؟}
+\begin{itemize}
+    \item \code{call P}: يضع في المكدس \textbf{عنوان التعليمة التي بعده} (\textenglish{IP})، ثم يقفز إلى \textenglish{P}.
+    \item \code{ret}: يأخذ هذا العنوان من المكدس ويضعه في \textenglish{IP}، فيعود التنفيذ بعد \code{call}.
+\end{itemize}
+
+\begin{khatwa}[: الاستدعاءان في البرنامج الآتي (العناوين الحقيقية)]
+    \begin{enumerate}
+        \item التعليمة \code{call print\_num} الأولى في الإزاحة \hex{0103} وطولها 3 بايتات، إذن التعليمة التي بعدها في \hex{0106}.
+              يضع المعالج \hex{0106} في المكدس، ثم يقفز إلى \code{print\_num}.
+        \item في نهاية الإجراء، \code{ret} تأخذ \hex{0106} من المكدس: يعود التنفيذ إلى \code{mov ax, 7}.
+        \item الاستدعاء الثاني في \hex{0109}، فيضع \hex{010C}، و\code{ret} تعود هذه المرة إلى \hex{010C}.
+    \end{enumerate}
+    الإجراء نفسه يعود إلى مكانين مختلفين، لأن عنوان العودة محفوظ في المكدس في كل مرة.
+\end{khatwa}
+
+\subsection{إجراء يطبع عددًا بالعشري}
+المقاطعة \code{int 21h} تطبع حروفًا فقط. لكي نطبع العدد 2026 يجب أن نستخرج أرقامه واحدًا واحدًا:
+
+\begin{khatwa}[: استخراج أرقام 2026]
+    \begin{center}
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        \ras{العملية} & \ras{الحاصل (\textenglish{AX})} & \ras{الباقي (\textenglish{DX})} & \ras{المكدس} \\ \hline
+        $2026 \div 10$ & 202 & 6 & 6 \\ \hline
+        $202 \div 10$ & 20 & 2 & 6، 2 \\ \hline
+        $20 \div 10$ & 2 & 0 & 6، 2، 0 \\ \hline
+        $2 \div 10$ & 0 (نتوقف) & 2 & 6، 2، 0، 2 \\ \hline
+    \end{tabular}
+    \end{center}
+    الأرقام تخرج بالعكس (6، 2، 0، 2). نضعها في المكدس، ثم نأخذها: فتخرج بالترتيب الصحيح 2، 0، 2، 6.
+\end{khatwa}
+
+\asm{ch3/procnum.asm}
+\screen{ch3/procnum.out}
+
+\begin{sharh}
+    \s{4--5}{نضع العدد في \textenglish{AX} (المعامل)، ثم نستدعي الإجراء.}
+    \s{10}{\code{proc} و\code{endp} يحددان بداية الإجراء ونهايته.}
+    \s{14}{\textenglish{DX = 0} ضروري قبل \code{div bx} (القسمة 16 بتًا تقسم \textenglish{DX:AX}).}
+    \s{16--17}{نضع الرقم في المكدس، ونعدّ الأرقام في \textenglish{CX}.}
+    \s{21--25}{\textenglish{CX} مرة: نأخذ رقمًا، نحوله إلى حرف بإضافة \code{'0'} (48)، ونطبعه.}
+    \s{28}{\code{ret} تعود إلى السطر 6 في المرة الأولى، وإلى السطر 8 في المرة الثانية.}
+\end{sharh}
+
+\subsection{تمرير المعاملات عبر المكدس}
+\asm{ch3/procstack.asm}
+
+بعد \code{mov bp, sp} في السطر 14، يبدو المكدس هكذا (القيم من التنفيذ الحقيقي):
+
+\begin{center}
+\begin{tikzpicture}[c/.style={draw=brandDark, fill=white, minimum width=3.2cm, minimum height=0.6cm, font=\small},
+    a/.style={font=\codefont\small, lawn=tealDeep}]
+    \foreach \ad/\v/\l [count=\i from 0] in {FFFC/{30 (المعامل الثاني)}/{BP+6}, FFFA/{12 (المعامل الأول)}/{BP+4},
+                                           FFF8/{عنوان العودة \textenglish{010B}}/{BP+2}, FFF6/{\textenglish{BP} القديم}/{BP}} {
+        \node[c] (n\i) at (0,-0.6*\i) {\v};
+        \node[a, right=0.15cm of n\i] {\textenglish{\ad}};
+        \node[font=\codefont\small\bfseries, left=0.15cm of n\i] {\textenglish{\l}};
+    }
+    \draw[sahmO] (-4.6,-1.8) node[left, font=\small] {\textenglish{SP = BP = FFF6}} -- (-3.0,-1.8);
+\end{tikzpicture}
+\end{center}
+
+\begin{sharh}
+    \s{4--7}{نضع المعاملين في المكدس: \textenglish{SP} ينتقل من \hex{FFFE} إلى \hex{FFFA}.}
+    \s{8}{\code{call} يضع عنوان العودة \hex{010B}: \textenglish{SP = \hex{FFF8}}.}
+    \s{13--14}{نحفظ \textenglish{BP}، ثم نجعل \textenglish{BP} ثابتًا على قمة المكدس (\hex{FFF6}).}
+    \s{15--16}{المعامل الأول في \textenglish{[BP+4]}، والثاني في \textenglish{[BP+6]}: $12 + 30 = 42$.}
+    \s{18}{\code{ret 4}: نعود، ثم نزيل 4 بايتات (المعاملين) من المكدس. \textenglish{SP} يعود إلى \hex{FFFE}.}
+\end{sharh}
+
+%================================================
+\section{المقاطعات}
+%================================================
+
+\begin{tarif}
+    \mustalah{المقاطعة}{Interruption}{Interrupt}: حدث يوقف البرنامج الحالي مؤقتًا، لينفذ المعالج
+    برنامجًا خاصًا (\textbf{معالج المقاطعة})، ثم يعود ليكمل من حيث توقف.
+\end{tarif}
+
+\begin{tashbih}
+    أنت تقرأ كتابًا، فيرن \textbf{جرس الباب}. تضع علامة في الصفحة، تفتح الباب، ثم تعود إلى القراءة
+    من الصفحة نفسها. الجرس هو المقاطعة، والعلامة في الكتاب هي ما يحفظه المعالج في المكدس.
+\end{tashbih}
+
+\subsection{أنواع المقاطعات}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3cm}|R|R|}
+    \hline
+    \ras{النوع} & \ras{من يسببها؟} & \ras{أمثلة} \\ \hline
+    عتادية & جهاز خارجي يرسل إشارة على المنفذ \textenglish{INTR} أو \textenglish{NMI} & ضغط مفتاح، الساعة، الطابعة جاهزة \\ \hline
+    برمجية & التعليمة \code{int n} في البرنامج & \code{int 21h} لخدمات \textenglish{DOS} \\ \hline
+    استثناءات & المعالج نفسه عند خطأ & القسمة على صفر (مقاطعة 0) \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{جدول أشعة المقاطعات}
+في بداية الذاكرة (من \hex{00000} إلى \hex{003FF}) يوجد جدول من 256 خانة، لكل مقاطعة 4 بايتات:
+الإزاحة ثم المقطع لمعالج المقاطعة.
+
+\begin{tarif}
+    \centering
+    شعاع المقاطعة رقم $n$ يوجد في العنوان: \quad $4 \times n$
+\end{tarif}
+
+\begin{mithal}
+    شعاع \code{int 21h}: $\hex{21} \times 4 = 33 \times 4 = 132 = \hex{84}$. إذن عنوان معالج \textenglish{DOS}
+    محفوظ في \hex{00084} إلى \hex{00087}.
+\end{mithal}
+
+\subsection{ماذا يفعل المعالج عند \code{int n}؟}
+\begin{enumerate}
+    \item يضع \textenglish{FLAGS} في المكدس، ثم يطفئ \textenglish{IF} و\textenglish{TF}.
+    \item يضع \textenglish{CS} ثم \textenglish{IP} في المكدس (العلامة في الكتاب).
+    \item يقرأ \textenglish{IP} و\textenglish{CS} الجديدين من الخانة $n \times 4$، فيقفز إلى معالج المقاطعة.
+    \item في نهاية المعالج، \code{iret} تأخذ \textenglish{IP} و\textenglish{CS} و\textenglish{FLAGS} من المكدس، فيعود البرنامج.
+\end{enumerate}
+
+\subsection{المقاطعة العتادية خطوة بخطوة}
+\begin{khatwa}[: تضغط على مفتاح أثناء تشغيل برنامج]
+    \begin{enumerate}
+        \item لوحة المفاتيح ترسل إشارة إلى \mustalah{متحكم المقاطعات}{Contrôleur d'interruptions}{PIC 8259}.
+        \item المتحكم يرسل إشارة على المدخل \textenglish{INTR} للمعالج.
+        \item إذا كان \textenglish{IF = 1}، يُكمل المعالج \textbf{التعليمة الحالية} أولًا، ثم يقبل المقاطعة.
+        \item المتحكم يعطي المعالج رقم المقاطعة (\hex{09} للوحة المفاتيح).
+        \item المعالج يحفظ \textenglish{FLAGS} و\textenglish{CS} و\textenglish{IP}، ثم يقفز إلى العنوان المكتوب في $4 \times 9 = \hex{24}$.
+        \item معالج المقاطعة يقرأ المفتاح من المنفذ \hex{60}، يحفظه، ثم ينفذ \code{iret}.
+        \item البرنامج يكمل من حيث توقف، دون أن «يشعر» بشيء.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{tarif}
+    \begin{itemize}
+        \item \code{cli} \textenglish{(clear IF)}: تمنع المقاطعات العتادية مؤقتًا، و\code{sti} \textenglish{(set IF)} تعيد السماح بها.
+              نستعملهما عندما يجب ألّا يُقاطَع جزء حساس من البرنامج.
+        \item المدخل \textenglish{NMI} \textenglish{(Non Maskable Interrupt)}: مقاطعة \textbf{لا يمكن منعها}، تُستعمل للأخطاء الخطيرة
+              مثل عطل في الذاكرة أو انقطاع التيار.
+    \end{itemize}
+\end{tarif}
+
+\subsection{برنامج: مقاطعتنا الخاصة}
+\asm{ch3/myint.asm}
+\screen{ch3/myint.out}
+
+\begin{sharh}
+    \s{4--5}{\textenglish{ES = 0}: نريد الكتابة في جدول الأشعة الموجود في المقطع 0.}
+    \s{6--8}{نكتب عنوان \code{handler} في الخانة $\hex{60} \times 4 = \hex{180}$: الإزاحة ثم المقطع.}
+    \s{10--11}{كل \code{int 60h} ينفذ \code{handler}: المرة الأولى يطبع \code{A}، والثانية \code{B}.}
+    \s{19}{\code{iret} وليس \code{ret}، لأن المقاطعة وضعت في المكدس \textenglish{FLAGS} أيضًا.}
+\end{sharh}
+
+%================================================
+\section{تمارين}
+%================================================
+
+\begin{tamrin}
+    احسب العنوان الفيزيائي في كل حالة: (أ) \textenglish{DS = 3000H}، \textenglish{BX = 0050H} مع \code{mov al, [bx]}.
+    (ب) \textenglish{SS = 4000H}، \textenglish{SP = FFFEH}.
+\end{tamrin}
+\begin{hall}
+    (أ) $\hex{30000} + \hex{0050} = \hex{30050}$. \quad (ب) $\hex{40000} + \hex{FFFE} = \hex{4FFFE}$.
+\end{hall}
+
+\begin{tamrin}
+    ما قيمة \textenglish{AX} بعد هذه التعليمات؟ \code{mov ax, 0F0Fh} ثم \code{and ax, 00FFh} ثم \code{shl ax, 1}.
+\end{tamrin}
+\begin{hall}
+    بعد \code{and}: \hex{000F}. بعد الإزاحة (ضرب في 2): \textenglish{\hex{001E} = 30}.
+\end{hall}
+
+\begin{tamrin}
+    اكتب برنامجًا يحسب $5! = 1 \times 2 \times 3 \times 4 \times 5$ بالتعليمة \code{loop}، ويضع النتيجة في \textenglish{AX}.
+\end{tamrin}
+\begin{hall}
+    \asm{ch3/ex_fact.asm}
+    النتيجة: \textenglish{AX = 0078} = 120 (جربناه في المحاكي).
+\end{hall}
+
+\begin{tamrin}
+    بعد \code{mov sp, 0100h} ثم \code{push ax} ثم \code{push bx} ثم \code{pop cx}: ما قيمة \textenglish{SP}، وأي قيمة في \textenglish{CX}؟
+\end{tamrin}
+\begin{hall}
+    بعد الدفعتين \textenglish{SP = \hex{00FC}}، وبعد \code{pop} \textenglish{SP = \hex{00FE}}.
+    \textenglish{CX} يأخذ آخر قيمة دخلت: قيمة \textenglish{BX}.
+\end{hall}
+
+\begin{tamrin}
+    ما عنوان شعاع المقاطعة رقم \hex{10} (خدمات الشاشة في \textenglish{BIOS})؟
+\end{tamrin}
+\begin{hall}
+    $\hex{10} \times 4 = 16 \times 4 = 64 = \hex{40}$: الخانات من \hex{00040} إلى \hex{00043}.
+\end{hall}
+
+\begin{tamrin}
+    فك ترميز التعليمة \textenglish{89 D8}.
+\end{tamrin}
+\begin{hall}
+    \textenglish{89}: \code{mov} 16 بتًا، \textenglish{d = 0}. \textenglish{D8} = \bin{11\,011\,000}: \textenglish{mod = 11} (سجل)،
+    \textenglish{reg = 011} (\textenglish{BX}، المصدر)، \textenglish{r/m = 000} (\textenglish{AX}). إذن: \code{mov ax, bx}.
+\end{hall}

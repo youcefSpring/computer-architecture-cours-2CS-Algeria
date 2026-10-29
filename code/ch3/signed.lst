@@ -1,0 +1,17 @@
+ 100:	b0 c8                	mov    al,0xc8
+ 102:	3c 64                	cmp    al,0x64
+ 104:	77 06                	ja     0x10c
+ 106:	8d 16 3f 01          	lea    dx,ds:0x13f
+ 10a:	eb 04                	jmp    0x110
+ 10c:	8d 16 29 01          	lea    dx,ds:0x129
+ 110:	b4 09                	mov    ah,0x9
+ 112:	cd 21                	int    0x21
+ 114:	b0 c8                	mov    al,0xc8
+ 116:	3c 64                	cmp    al,0x64
+ 118:	7f 06                	jg     0x120
+ 11a:	8d 16 68 01          	lea    dx,ds:0x168
+ 11e:	eb 04                	jmp    0x124
+ 120:	8d 16 56 01          	lea    dx,ds:0x156
+ 124:	b4 09                	mov    ah,0x9
+ 126:	cd 21                	int    0x21
+ 128:	c3                   	ret    

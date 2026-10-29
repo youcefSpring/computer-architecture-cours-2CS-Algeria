@@ -1,0 +1,9 @@
+ 100:	8d 36 17 01          	lea    si,ds:0x117
+ 104:	8d 3e 1d 01          	lea    di,ds:0x11d
+ 108:	b9 06 00             	mov    cx,0x6
+ 10b:	fc                   	cld    
+ 10c:	f3 a4                	rep movs BYTE PTR es:[di],BYTE PTR ds:[si]
+ 10e:	8d 16 1d 01          	lea    dx,ds:0x11d
+ 112:	b4 09                	mov    ah,0x9
+ 114:	cd 21                	int    0x21
+ 116:	c3                   	ret    

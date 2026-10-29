@@ -1,0 +1,647 @@
+\chapter{General Organization of the Central Unit}
+
+\begin{khulasa}[: what will we learn in this chapter?]
+\begin{itemize}
+    \item What a computer is, and how it changed through history.
+    \item The main parts: the processor, the memory, the input/output devices.
+    \item The Von Neumann and Harvard models, and the difference between them.
+    \item The types of memory, and how to calculate a memory size.
+    \item The three buses: the data bus, the address bus, the control bus.
+\end{itemize}
+\end{khulasa}
+
+%================================================
+\section{What is a computer?}
+%================================================
+
+\begin{tarif}
+    A \term{computer}{ordinateur} is an electronic machine. It receives \textbf{data},
+    processes it with a \textbf{program} (a list of instructions), and gives \textbf{results}.
+    It can also store data and results.
+\end{tarif}
+
+Everything a computer does fits in four verbs: it \textbf{receives}, it \textbf{processes},
+it \textbf{stores}, it \textbf{outputs}.
+
+\begin{center}
+\begin{tikzpicture}[node distance=1.4cm]
+    \node[unit=brandGreen, minimum width=2.8cm, minimum height=1.2cm] (in) {Input\\{\small keyboard, mouse}};
+    \node[unit, minimum width=2.8cm, minimum height=1.2cm, right=of in] (cpu) {Processing\\{\small the processor}};
+    \node[unit=brandOrange, minimum width=2.8cm, minimum height=1.2cm, right=of cpu] (out) {Output\\{\small screen, printer}};
+    \node[unit=brandPurple, minimum width=2.8cm, minimum height=1.1cm, below=1cm of cpu] (mem) {Storage\\{\small memory, disk}};
+    \draw[sahmT] (in) -- (cpu);
+    \draw[sahmT] (cpu) -- (out);
+    \draw[sahmT, <->] (cpu) -- (mem);
+\end{tikzpicture}
+\end{center}
+
+Let us take a simple example: you use the calculator app on your computer to compute $25 \times 4$.
+\begin{enumerate}
+    \item \textbf{Input}: you type 25, then $\times$, then 4 on the keyboard. Each key press becomes a
+          number code that goes into the computer.
+    \item \textbf{Temporary storage}: the computer keeps the two numbers in memory, because it needs them soon.
+    \item \textbf{Processing}: the processor reads the two numbers, runs the multiply instruction, and gets 100.
+    \item \textbf{Output}: the computer sends the result to the screen, and you see it.
+\end{enumerate}
+Every program you use, even a complex one (a game, a browser, a photo app), is in fact millions of
+these small steps, done very fast.
+
+\begin{tashbih}
+    A computer is like a \textbf{restaurant kitchen}. The ingredients (vegetables, meat) are the \textbf{data}.
+    The recipe is the \textbf{program}. The cook is the \textbf{processor}. The fridge is the \textbf{memory}.
+    The finished dish is the \textbf{result}. The cook does not decide alone: he follows the recipe step by step.
+\end{tashbih}
+
+\subsection{Hardware and software}
+\begin{itemize}
+    \item \term{Hardware}{matériel}: everything you can touch: the processor, the memory, the screen, the wires.
+    \item \term{Software}{logiciel}: the programs that tell the hardware what to do: the operating
+          system, the browser, games.
+\end{itemize}
+In this course we study \textbf{the hardware from the inside}, and we see how it runs programs.
+
+\subsection{The layers of a computer}
+We can see a computer as layers, one on top of the other. Each layer uses the services of the layer
+below it, without knowing all its details:
+
+\begin{center}
+\begin{tikzpicture}[l/.style={draw=#1, fill=#1!15, very thick, minimum width=9cm, minimum height=0.75cm, font=\small}]
+    \node[l=brandGreen] at (0,1.8) {Applications: browser, games, word processor};
+    \node[l=brandPurple] at (0,0.9) {Operating system: Windows, Linux, Android};
+    \node[l=brandOrange] at (0,0) {Machine language and assembly: what the processor understands};
+    \node[l=brandTeal] at (0,-0.9) {Hardware: processor, memory, buses, electronic circuits};
+    \draw[sahmT] (5,-1.1) -- (5,2) node[midway, right, font=\small] {from machine to human};
+\end{tikzpicture}
+\end{center}
+In this course we work on the \textbf{two lowest layers}: the hardware, and the assembly language
+that talks to it directly.
+
+\subsection{How does a program run?}
+When you double-click on a program icon, these steps happen:
+\begin{enumerate}
+    \item The program is stored on the \textbf{disk} (SSD or HDD) as a file of zeros and ones.
+    \item The operating system \textbf{copies it into the main memory} (RAM), because the disk is very slow
+          and the processor does not read from it directly.
+    \item The processor reads the instructions from memory \textbf{one after the other} and runs them.
+    \item When you close the program, its space in memory is freed for other programs.
+\end{enumerate}
+
+%================================================
+\section{A short history of computers}
+%================================================
+
+The computer did not appear in one day. These are the main steps:
+
+\begin{center}
+\begin{tikzpicture}[
+    yr/.style={circle, fill=brandTeal, minimum size=0.35cm, inner sep=0pt},
+    txt/.style={text width=2.7cm, align=center, font=\small}]
+    \draw[brandTeal, line width=3pt] (0,0) -- (14,0);
+    \foreach \x/\y/\t/\p in {
+        0/1642/{Pascal's machine\\ adds, subtracts}/above,
+        2/1837/{Babbage's machine\\ idea of a program}/below,
+        4/1945/{ENIAC\\ vacuum tubes}/above,
+        6/1947/{invention of the\\ \textbf{transistor}}/below,
+        8/1958/{\textbf{integrated circuit}\\ (IC)}/above,
+        10/1971/{first microprocessor\\ Intel 4004}/below,
+        12/1978/{the\\ Intel 8086}/above,
+        14/2005/{\textbf{multi-core}\\ processors}/below} {
+        \node[yr] (n) at (\x, 0) {};
+        \node[txt, \p=0.25cm of n] {\textbf{\y}\\ \t};
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|c|}
+    \hline
+    \ras{Generation} & \ras{Period} & \ras{Main technology} & \ras{Example} \\ \hline
+    1st & 1945--1955 & vacuum tubes & ENIAC (30 tons!) \\ \hline
+    2nd & 1955--1965 & transistor & IBM 7090 \\ \hline
+    3rd & 1965--1980 & integrated circuits & IBM 360 \\ \hline
+    4th & 1980--today & microprocessor (VLSI) & personal computer, phone \\ \hline
+\end{tabular}
+\end{table}
+
+Each new generation brought a technology that made the parts \textbf{smaller}, \textbf{faster}
+and \textbf{less hungry for energy}:
+\begin{itemize}
+    \item \textbf{Vacuum tubes} were big, got very hot, and burned out all the time. Some had to be changed almost every day.
+    \item A \textbf{transistor} does the same job (an electric switch that opens and closes), but it is hundreds of times smaller and does not burn out.
+    \item An \textbf{integrated circuit} puts thousands of transistors on one small piece of silicon, instead of connecting them with wires.
+    \item A \textbf{microprocessor} puts the \textbf{whole} processor on one chip. This gave us the personal computer, then the smartphone.
+\end{itemize}
+
+\begin{tarif}
+    \term{Moore's law}{loi de Moore}: in 1965, Gordon Moore (a founder of Intel) noticed that the number
+    of transistors on a chip \textbf{doubles about every two years}. This stayed true for more than fifty
+    years: from 2\,300 transistors in the 4004 to tens of billions today.
+\end{tarif}
+
+\begin{hal}
+    ENIAC filled a whole room and used 150 kilowatts. Your phone is millions of times more powerful and runs
+    on a small battery. The reason: transistors became tiny, so one processor now holds billions of them.
+\end{hal}
+
+%================================================
+\section{Quick reminder: how does a computer count?}
+%================================================
+
+A computer only knows two electric states: \textbf{current flows} or \textbf{current does not flow}.
+We write them 1 and 0.
+
+\begin{tarif}
+    \begin{itemize}
+        \item A \term{bit}{bit}: the smallest unit of information. Its value is 0 or 1.
+        \item A \term{byte}{octet}: a group of \textbf{8 bits}.
+        \item A \term{word}{mot}: the number of bits the processor handles at once (16 bits in the 8086).
+    \end{itemize}
+\end{tarif}
+
+We write numbers in three systems: decimal (base 10), binary (base 2), and hexadecimal (base 16, its
+digits are 0 to 9, then A to F).
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c||c|c|c|}
+    \hline
+    \ras{Decimal} & \ras{Binary} & \ras{Hex} & \ras{Decimal} & \ras{Binary} & \ras{Hex} \\ \hline
+    0 & 0000 & 0 & 8  & 1000 & 8 \\ \hline
+    1 & 0001 & 1 & 9  & 1001 & 9 \\ \hline
+    2 & 0010 & 2 & 10 & 1010 & A \\ \hline
+    3 & 0011 & 3 & 11 & 1011 & B \\ \hline
+    4 & 0100 & 4 & 12 & 1100 & C \\ \hline
+    5 & 0101 & 5 & 13 & 1101 & D \\ \hline
+    6 & 0110 & 6 & 14 & 1110 & E \\ \hline
+    7 & 0111 & 7 & 15 & 1111 & F \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: convert \hex{2F} to binary and to decimal]
+    \begin{enumerate}
+        \item Each hex digit is \textbf{4 bits}: $2 = 0010$ and $F = 1111$.
+        \item Put them side by side: $\hex{2F} = \bin{0010\,1111}$.
+        \item To decimal: $2 \times 16 + 15 = 32 + 15 = 47$.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{khatwa}[: convert the binary number 1011 to decimal]
+    Each bit has a ``weight'', a power of 2. We start on the right with $2^0 = 1$:
+    \begin{center}
+    \begin{tabular}{|c|c|c|c|c|}
+        \hline \ras{Bit} & 1 & 0 & 1 & 1 \\ \hline
+        \ras{Weight} & $2^3 = 8$ & $2^2 = 4$ & $2^1 = 2$ & $2^0 = 1$ \\ \hline
+        \ras{Bit $\times$ weight} & 8 & 0 & 2 & 1 \\ \hline
+    \end{tabular}
+    \end{center}
+    We add: $8 + 0 + 2 + 1 = 11$. So $\bin{1011} = 11$.
+\end{khatwa}
+
+\begin{khatwa}[: convert the decimal number 13 to binary (divide by 2 again and again)]
+    \begin{enumerate}
+        \item $13 \div 2 = 6$, remainder \textbf{1}.
+        \item $6 \div 2 = 3$, remainder \textbf{0}.
+        \item $3 \div 2 = 1$, remainder \textbf{1}.
+        \item $1 \div 2 = 0$, remainder \textbf{1}. We stop, because the quotient is 0.
+        \item Read the remainders \textbf{from the last to the first}: \bin{1101}. Check: $8 + 4 + 0 + 1 = 13$.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{tashbih}
+    Why use hexadecimal? Because binary numbers are long and tiring to read: \bin{1010\,1111\,0011\,0110}.
+    Hexadecimal packs every 4 bits into one digit, so the number becomes \hex{AF36}. It is the
+    ``short form'' programmers use to write binary quickly, like writing ``Dr.'' instead of ``Doctor''.
+\end{tashbih}
+
+\begin{intabih}
+    In assembly language we write \code{h} after a hex number (\code{2Fh}), and \code{b} after a binary
+    number (\code{00101111b}). A number without a letter is decimal.
+\end{intabih}
+
+\subsection{Memory size units}
+\begin{center}
+\begin{tabular}{|c|c|c|}
+    \hline
+    \ras{Unit} & \ras{Symbol} & \ras{Value} \\ \hline
+    kilobyte & KB & $2^{10} = 1024$ bytes \\ \hline
+    megabyte & MB & $2^{20} = 1\,048\,576$ bytes \\ \hline
+    gigabyte & GB & $2^{30}$ bytes (about one billion) \\ \hline
+    terabyte & TB & $2^{40}$ bytes \\ \hline
+\end{tabular}
+\end{center}
+
+%================================================
+\section{The main parts of a computer}
+%================================================
+
+Inside every computer, from the biggest server to the smallest smartwatch, we find three main parts:
+
+\begin{center}
+\begin{tikzpicture}
+    \node[unit, minimum width=4cm, minimum height=2.6cm] (cpu) at (0,0) {};
+    \node[font=\bfseries] at (0, 1) {Processor (CPU)};
+    \node[unit=brandOrange, minimum width=1.6cm, font=\small] at (-0.95, 0) {UC\\control};
+    \node[unit=brandGreen, minimum width=1.6cm, font=\small] at (0.95, 0) {UAL\\compute};
+    \node[draw=brandDark, fill=white, font=\small, minimum width=3.4cm] at (0,-0.9) {registers};
+    \node[unit=brandPurple, minimum width=3.4cm, minimum height=2.6cm] (mem) at (-6,0) {Main memory\\{\small RAM and ROM}};
+    \node[unit=brandGreen, minimum width=3.4cm, minimum height=2.6cm] (io) at (6,0) {Input/output\\devices};
+    \draw[sahmT, <->] (cpu) -- (mem);
+    \draw[sahmT, <->] (cpu) -- (io);
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}
+    \item The \term{processor}{processeur} (CPU): the ``brain'' of the computer. It reads the instructions and runs them.
+    \item The \term{main memory}{mémoire centrale}: it keeps the program that is running now, and its data.
+    \item The \term{input/output devices}{périphériques d'E/S}: they let the computer talk with the outside world.
+\end{enumerate}
+
+\begin{khatwa}[: the trip of a letter from the keyboard to the screen]
+    You press the key \textbf{A} in a text editor:
+    \begin{enumerate}
+        \item The keyboard (\textbf{input}) sends the code of the key to the computer.
+        \item The processor is interrupted (it stops its work for a moment), reads the code, and stores it in
+              \textbf{memory}, inside the text you are writing.
+        \item The text editor asks the processor to ``draw'' the letter: the processor computes the light dots that make the letter.
+        \item These dots go to the graphics card, then to the screen (\textbf{output}).
+    \end{enumerate}
+    All this happens in a tiny part of a second, so the letter seems to appear at once.
+\end{khatwa}
+
+\begin{tarif}
+    The \term{central unit}{unité centrale}: the processor plus the main memory. This is the part that really runs the programs.
+\end{tarif}
+
+%================================================
+\section{The two basic models: Von Neumann and Harvard}
+%================================================
+
+\subsection{The Von Neumann model}
+
+In 1945, the scientist John von Neumann proposed a simple and brilliant idea: we keep the
+\textbf{program} and the \textbf{data} together in \textbf{the same memory}. Before that, changing the
+program meant re-connecting wires by hand!
+
+In Von Neumann's model, a computer has \textbf{five units}: input, output, memory, the arithmetic and
+logic unit, and the control unit. The key idea is the \term{stored program}{programme enregistré}: instructions
+are numbers, just like data, so we can keep them in the same memory, and read and change them the same way.
+
+\begin{center}
+\begin{tikzpicture}
+    \node[unit, minimum width=4.2cm, minimum height=2.4cm] (cpu) at (0,0) {};
+    \node[font=\bfseries] at (0,0.85) {Processor};
+    \node[unit=brandOrange, font=\small, minimum width=1.7cm] at (-1,-0.15) {control unit};
+    \node[unit=brandGreen, font=\small, minimum width=1.7cm] at (1,-0.15) {UAL};
+    \node[unit=brandPurple, minimum width=4.2cm, minimum height=2.4cm, align=center] (mem) at (-7,0) {};
+    \node[font=\bfseries] at (-7,0.85) {one memory};
+    \node[draw=brandDark, fill=brandTeal!20, font=\small, minimum width=3.4cm] at (-7,0.1) {program (instructions)};
+    \node[draw=brandDark, fill=brandOrange!20, font=\small, minimum width=3.4cm] at (-7,-0.6) {data};
+    \draw[brandDark, line width=5pt, {Stealth[length=4mm]}-{Stealth[length=4mm]}] (-4.8,0) -- (-2.2,0);
+    \node[font=\small, above] at (-3.5,0.2) {one bus};
+    \node[unit=brandGreen, minimum width=2.6cm, minimum height=1.2cm] (io) at (5,0) {input and\\output};
+    \draw[sahmT, <->] (cpu) -- (io);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{Advantage}: simple and flexible. To change the program, we just load another program into memory.
+    \item \textbf{Drawback}: one bus for instructions and data, so we cannot read an instruction and a data
+          item at the same moment. This traffic jam is called the \term{Von Neumann bottleneck}{goulot de Von Neumann}.
+\end{itemize}
+
+\begin{tashbih}
+    Imagine a library with \textbf{one narrow door}. The students who bring back books (the data) and the
+    students who come for instructions (the program) all use the same door, one by one. Even if the staff
+    inside is very fast, the door decides the speed. This is the bottleneck.
+\end{tashbih}
+
+\subsection{The Harvard model}
+In this model we use \textbf{two separate memories}: one for instructions and one for data. Each one has its own bus.
+
+\begin{center}
+\begin{tikzpicture}
+    \node[unit, minimum width=3.4cm, minimum height=2.2cm] (cpu) at (0,0) {Processor};
+    \node[unit=brandTeal, minimum width=3.6cm, minimum height=1.6cm] (im) at (-6.5,0) {instruction memory\\{\small the program}};
+    \node[unit=brandOrange, minimum width=3.6cm, minimum height=1.6cm] (dm) at (6.5,0) {data memory\\{\small the variables}};
+    \draw[tealDeep, line width=4pt, -{Stealth[length=4mm]}] (im) -- (cpu) node[midway, above, font=\small, text=brandDark] {instruction bus};
+    \draw[orangeDeep, line width=4pt, {Stealth[length=4mm]}-{Stealth[length=4mm]}] (cpu) -- (dm) node[midway, above, font=\small, text=brandDark] {data bus};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{Advantage}: faster, because the processor reads the next instruction and a data item at the same time.
+    \item \textbf{Drawback}: more complex and more expensive, and the size of each memory is fixed.
+\end{itemize}
+
+\begin{tashbih}
+    In the Harvard library there are \textbf{two doors}: one for instructions and one for data. The two
+    queues move at the same time, so people get in faster. But two doors cost more, and if one side is full
+    we cannot use the free space of the other side.
+\end{tashbih}
+
+\subsection{Comparison and uses}
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3cm}|C|C|}
+    \hline
+    \ras{} & \ras{Von Neumann} & \ras{Harvard} \\ \hline
+    Memory   & one memory for program and data & two separate memories \\ \hline
+    Buses    & one shared bus & two independent buses \\ \hline
+    Speed    & slower (bottleneck) & faster (two reads at once) \\ \hline
+    Complexity & simple and cheap & more complex, more expensive \\ \hline
+    Used in  & personal computers, servers & microcontrollers (Arduino), signal processors (DSP) \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{hal}
+    The processors in your computer mix the two models. The main memory (RAM) is shared (Von Neumann), but
+    inside the processor there are two small, fast, separate memories: one for instructions and one for data
+    (Harvard). We call this \textbf{modified Harvard}. We come back to it in Chapter 5.
+\end{hal}
+
+%================================================
+\section{The processor: role and parts}
+%================================================
+
+\begin{tarif}
+    The \term{processor}{processeur, UCT} (CPU): the circuit that runs the instructions of a program, one after the other.
+\end{tarif}
+
+The processor has three main parts (we study them in detail in Chapter 2):
+
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{4.2cm}|R|R|}
+    \hline
+    \ras{Part} & \ras{Its job} & \ras{Analogy} \\ \hline
+    control unit (UC) & reads the instruction, understands it, gives orders to the other parts & the orchestra conductor \\ \hline
+    arithmetic and logic unit (UAL) & does arithmetic ($+$, $-$) and logic (AND, OR) & the calculator \\ \hline
+    registers & very small and very fast memory inside the processor & the scrap paper on the desk \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{The clock and the speed of the processor}
+The processor works to the rhythm of a \term{clock}{horloge} that sends regular pulses. At each pulse the
+processor moves one small step forward in its work.
+
+\begin{tarif}
+    The \textbf{frequency} $f$: the number of pulses per second, measured in hertz (Hz).
+    The \textbf{period} $T$: the length of one pulse, and $T = \dfrac{1}{f}$.
+\end{tarif}
+
+\begin{khatwa}[: a processor at 3 GHz]
+    \begin{enumerate}
+        \item $f = 3\ \text{GHz} = 3 \times 10^{9}$ pulses per second.
+        \item $T = \dfrac{1}{3 \times 10^{9}} \approx 0.33 \times 10^{-9}$ second, so about 0.33 nanosecond.
+        \item In the time you blink (about 0.1 second), this processor does 300 million cycles!
+    \end{enumerate}
+\end{khatwa}
+
+\begin{intabih}
+    The frequency alone does not decide the speed of a processor. What matters is the \textbf{number of
+    instructions done per second}. A 3 GHz processor that needs 4 cycles per instruction runs
+    $\frac{3 \times 10^9}{4} = 750$ million instructions per second. A 2 GHz processor that runs 2 instructions
+    per cycle runs $4 \times 10^9$ instructions per second: it is faster, even with a lower frequency.
+\end{intabih}
+
+%================================================
+\section{Memory}
+%================================================
+
+\subsection{What does memory look like inside?}
+Imagine memory as a \textbf{big building full of boxes}. Each box has a number called the
+\textbf{address}, and each box holds \textbf{one byte}.
+
+\begin{center}
+\begin{tikzpicture}[cellx/.style={draw=brandDark, fill=white, minimum width=2.4cm, minimum height=0.6cm, font=\codefont},
+    addr/.style={font=\codefont\small, text=tealDeep}]
+    \foreach \a/\v [count=\i from 0] in {0000/3A, 0001/FF, 0002/07, 0003/41, 0004/00} {
+        \node[cellx] (c\i) at (0, -0.6*\i) {\v};
+        \node[addr, left=0.2cm of c\i] {\a};
+    }
+    \node[font=\small\bfseries] at (-2.15, 0.6) {address};
+    \node[font=\small\bfseries] at (0, 0.6) {content};
+    \node[font=\small, text width=6.5cm, align=left] at (5.5,-1.2)
+        {Address 0003 holds \hex{41}.\\
+         The address never changes; the content can change.};
+\end{tikzpicture}
+\end{center}
+
+\begin{tashbih}
+    The address is like the \textbf{house number} in a street, and the content is like \textbf{the person
+    who lives there}. The house number is fixed; the people living there can change.
+\end{tashbih}
+
+\subsection{Only two operations: read and write}
+\begin{itemize}
+    \item \textbf{Read}: the processor sends an address, and the memory gives back the content (the content does not change).
+    \item \textbf{Write}: the processor sends an address and a value, and the memory stores the value instead of the old one.
+\end{itemize}
+
+\begin{mithal}
+    Box 0002 holds \hex{07}. The processor runs ``write \hex{55} at 0002''. After that, the box holds
+    \hex{55}, and \hex{07} is lost for ever. So we must be careful where we write: writing in the wrong place
+    erases important data.
+\end{mithal}
+
+\begin{tarif}
+    \term{Random Access Memory}{mémoire à accès aléatoire} (RAM): ``random access'' means we can reach
+    \textbf{any box directly}, in the same time, without going through the boxes before it. This is the
+    opposite of an old cassette tape, which you must wind until you reach the song.
+\end{tarif}
+
+\subsection{Types of memory}
+\begin{center}
+\begin{tikzpicture}[level distance=1.4cm,
+    level 1/.style={sibling distance=7cm},
+    level 2/.style={sibling distance=2.3cm},
+    every node/.append style={unit, font=\small, minimum width=1.9cm},
+    edge from parent/.style={draw, brandMuted, thick}]
+    \node[unit=brandDark, fill=brandDark!10] {main memory}
+        child {node[unit=brandOrange] {RAM\\{\scriptsize read and write}}
+            child {node[unit=brandOrange] {SRAM\\{\scriptsize fast}}}
+            child {node[unit=brandOrange] {DRAM\\{\scriptsize cheap}}}}
+        child {node[unit=brandTeal] {ROM\\{\scriptsize read only}}
+            child {node {PROM}}
+            child {node {EPROM}}
+            child {node {EEPROM\\{\scriptsize and Flash}}}};
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{2.2cm}|R|>{\centering\arraybackslash}p{2.4cm}|R|}
+    \hline
+    \ras{Type} & \ras{Description} & \ras{When power is off} & \ras{Used for} \\ \hline
+    SRAM & transistors only, very fast and expensive & erased & cache memory inside the processor \\ \hline
+    DRAM & a tiny capacitor per bit, must be ``refreshed'' all the time & erased & main memory (RAM sticks) \\ \hline
+    ROM  & written once in the factory & kept & old boot programs \\ \hline
+    EPROM & erased with ultraviolet light, then written again & kept & prototypes \\ \hline
+    EEPROM / Flash & erased electrically & kept & BIOS/UEFI, USB keys, SSD \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{tashbih}
+    \textbf{SRAM} is like a light switch: it stays in its position (on or off) as long as there is power.
+    \textbf{DRAM} is like a glass with a small hole: the water (the electric charge) leaks slowly, so we must
+    fill it again thousands of times per second. This is called \textbf{refresh}. But the glass is much
+    smaller than the switch, so we can put billions of them on a cheap memory stick.
+\end{tashbih}
+
+\begin{hal}
+    Why does a computer need ROM or Flash? When you switch it on, the RAM is completely empty. The processor
+    needs a first program to start with: the boot program (BIOS or UEFI), kept in a memory that is not erased.
+    This program checks the hardware, then finds the operating system on the disk and loads it into RAM.
+\end{hal}
+
+\begin{tarif}
+    A \term{volatile}{volatile} memory loses its content when the power is off (RAM).
+    A \term{non-volatile}{non volatile} memory keeps it (ROM, Flash).
+\end{tarif}
+
+\subsection{Calculating the size of a memory}
+If the processor has $n$ address lines (wires), it can write $2^n$ different addresses.
+
+\begin{tarif}
+    $\text{number of boxes} = 2^{n}$ \qquad and \qquad
+    $\text{size} = 2^{n} \times \text{size of one box}$
+\end{tarif}
+
+\begin{khatwa}[: the memory size of the 8086]
+    The 8086 has a \textbf{20-bit} address bus, and each box holds one byte.
+    \begin{enumerate}
+        \item Number of addresses: $2^{20}$.
+        \item $2^{20} = 2^{10} \times 2^{10} = 1024 \times 1024 = 1\,048\,576$ addresses.
+        \item Size $= 2^{20} \times 1$ byte $= 1$ megabyte (1 MB).
+    \end{enumerate}
+\end{khatwa}
+
+\begin{khatwa}[: how many address lines for a 64 KB memory?]
+    \begin{enumerate}
+        \item $64\ \text{KB} = 64 \times 1024 = 2^{6} \times 2^{10} = 2^{16}$ bytes.
+        \item So $2^{n} = 2^{16}$, and $n = 16$ lines.
+    \end{enumerate}
+\end{khatwa}
+
+%================================================
+\section{Buses}
+%================================================
+
+\begin{tarif}
+    A \term{bus}{bus}: a group of parallel wires that carries information between the processor, the memory
+    and the input/output devices. Each wire carries one bit at a time.
+\end{tarif}
+
+\begin{center}
+\begin{tikzpicture}
+    \node[unit, minimum width=2.8cm, minimum height=4cm] (cpu) at (-5,0) {Processor};
+    \node[unit=brandPurple, minimum width=2.6cm, minimum height=1.2cm] (mem) at (0,2.6) {Memory};
+    \node[unit=brandGreen, minimum width=2.6cm, minimum height=1.2cm] (io) at (4,2.6) {Input and\\output};
+    \draw[brandOrange, line width=5pt] (-3.6,0.9) -- (6,0.9);
+    \draw[brandTeal!80!black, line width=5pt] (-3.6,0) -- (6,0);
+    \draw[brandMuted, line width=5pt] (-3.6,-0.9) -- (6,-0.9);
+    \node[font=\small\bfseries, text=orangeDeep, anchor=west] at (6.1,0.9) {address bus};
+    \node[font=\small\bfseries, text=tealDeep, anchor=west] at (6.1,0) {data bus};
+    \node[font=\small\bfseries, text=brandMuted, anchor=west] at (6.1,-0.9) {control bus};
+    \foreach \x in {0, 4} {
+        \draw[brandOrange, line width=2pt, -{Stealth}] (\x-0.6,0.9) -- (\x-0.6,1.95);
+        \draw[brandTeal!80!black, line width=2pt, {Stealth}-{Stealth}] (\x,0) -- (\x,1.95);
+        \draw[brandMuted, line width=2pt, {Stealth}-{Stealth}] (\x+0.6,-0.9) -- (\x+0.6,1.95);
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3cm}|>{\centering\arraybackslash}p{2.6cm}|R|}
+    \hline
+    \ras{Bus} & \ras{Direction} & \ras{What does it carry?} \\ \hline
+    \textbf{address} bus & from the processor only & the number of the box the processor wants to read or write \\ \hline
+    \textbf{data} bus & both ways & the value that is read or written \\ \hline
+    \textbf{control} bus & both ways & signals such as read (RD), write (WR), clock, interrupt \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{tashbih}
+    Imagine you ask for a parcel at the post office. The \textbf{address} tells the clerk which shelf you mean
+    (address bus). The \textbf{parcel} itself is the data (data bus). The words ``give me'' or ``take this''
+    are the control signal (read or write).
+\end{tashbih}
+
+\begin{khatwa}[: the processor reads box 0003]
+    \begin{enumerate}
+        \item The processor puts the address 0003 on the \textbf{address bus}.
+        \item It sends a \textbf{read} signal (RD) on the \textbf{control bus}.
+        \item The memory puts the content of the box (\hex{41}) on the \textbf{data bus}.
+        \item The processor takes the value \hex{41} and keeps it in one of its registers.
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{Bus width}
+\begin{itemize}
+    \item The \textbf{width of the address bus} decides the \textbf{maximum memory size}: $n$ lines give $2^n$ addresses.
+    \item The \textbf{width of the data bus} decides \textbf{how many bits move at once}: a 16-bit bus moves two bytes at a time.
+\end{itemize}
+
+\begin{khatwa}[: moving 1000 bytes with different buses]
+    \begin{enumerate}
+        \item An \textbf{8-bit} data bus moves one byte at a time: we need 1000 transfers.
+        \item A \textbf{16-bit} bus moves two bytes: $1000 \div 2 = 500$ transfers.
+        \item A \textbf{64-bit} bus moves 8 bytes: $1000 \div 8 = 125$ transfers only.
+    \end{enumerate}
+    The wider the bus, the faster the data moves, just as more cars pass on an 8-lane motorway than on a one-lane road.
+\end{khatwa}
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+    \hline
+    \ras{Processor} & \ras{Data bus} & \ras{Address bus} & \ras{Max memory} \\ \hline
+    Intel 8086 & 16 bits & 20 bits & $2^{20}$ = 1 MB \\ \hline
+    Intel 80386 & 32 bits & 32 bits & $2^{32}$ = 4 GB \\ \hline
+    modern x86-64 & 64 bits & 48 bits (in practice) & $2^{48}$ = 256 TB \\ \hline
+\end{tabular}
+\end{center}
+
+%================================================
+\section{Exercises}
+%================================================
+
+\begin{tamrin}
+    Convert these numbers: (a) \hex{3C} to decimal and binary. (b) The decimal number 200 to hexadecimal.
+\end{tamrin}
+\begin{hall}
+    (a) $\hex{3C} = 3 \times 16 + 12 = 60$, and in binary $\bin{0011\,1100}$.\\
+    (b) $200 = 12 \times 16 + 8$, and 12 is written C, so $200 = \hex{C8}$.
+\end{hall}
+
+\begin{tamrin}
+    A processor has a 24-bit address bus, and each memory box holds one byte. What is the maximum memory size?
+\end{tamrin}
+\begin{hall}
+    $2^{24} = 2^{4} \times 2^{20} = 16 \times 1\ \text{MB} = 16\ \text{MB}$.
+\end{hall}
+
+\begin{tamrin}
+    We want a 4 GB memory. How many lines does the address bus need?
+\end{tamrin}
+\begin{hall}
+    $4\ \text{GB} = 2^{2} \times 2^{30} = 2^{32}$ bytes, so we need \textbf{32 lines}.
+\end{hall}
+
+\begin{tamrin}
+    True or false? Explain.
+    (a) In the Von Neumann model, the program is kept in a different memory from the data.
+    (b) The address bus carries information in both directions.
+    (c) DRAM keeps its content after the computer is switched off.
+\end{tamrin}
+\begin{hall}
+    (a) \textbf{False}: Von Neumann has one memory for program and data; separation is the Harvard model.\\
+    (b) \textbf{False}: only the processor sends addresses, so it goes one way.\\
+    (c) \textbf{False}: DRAM is volatile; it is erased when the power goes off.
+\end{hall}
+
+\begin{tamrin}
+    A processor runs at 2 GHz, and each instruction needs 4 cycles on average. How many instructions does it run per second?
+\end{tamrin}
+\begin{hall}
+    Cycles per second $= 2 \times 10^{9}$. Instructions $= \dfrac{2 \times 10^{9}}{4} = 0.5 \times 10^{9}$,
+    that is \textbf{500 million instructions per second}.
+\end{hall}

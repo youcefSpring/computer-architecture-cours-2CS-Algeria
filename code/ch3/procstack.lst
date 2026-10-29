@@ -1,0 +1,13 @@
+ 100:	b8 1e 00             	mov    ax,0x1e
+ 103:	50                   	push   ax
+ 104:	b8 0c 00             	mov    ax,0xc
+ 107:	50                   	push   ax
+ 108:	e8 04 00             	call   0x10f
+ 10b:	a3 1c 01             	mov    ds:0x11c,ax
+ 10e:	c3                   	ret    
+ 10f:	55                   	push   bp
+ 110:	89 e5                	mov    bp,sp
+ 112:	8b 46 04             	mov    ax,WORD PTR [bp+0x4]
+ 115:	03 46 06             	add    ax,WORD PTR [bp+0x6]
+ 118:	5d                   	pop    bp
+ 119:	c2 04 00             	ret    0x4

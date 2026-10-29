@@ -1,0 +1,14 @@
+ 100:	8d 16 1f 01          	lea    dx,ds:0x11f
+ 104:	b4 09                	mov    ah,0x9
+ 106:	cd 21                	int    0x21
+ 108:	b4 01                	mov    ah,0x1
+ 10a:	cd 21                	int    0x21
+ 10c:	2c 20                	sub    al,0x20
+ 10e:	88 c3                	mov    bl,al
+ 110:	8d 16 2f 01          	lea    dx,ds:0x12f
+ 114:	b4 09                	mov    ah,0x9
+ 116:	cd 21                	int    0x21
+ 118:	88 da                	mov    dl,bl
+ 11a:	b4 02                	mov    ah,0x2
+ 11c:	cd 21                	int    0x21
+ 11e:	c3                   	ret    

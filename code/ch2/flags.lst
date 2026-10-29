@@ -1,0 +1,9 @@
+ 100:	b0 c8                	mov    al,0xc8
+ 102:	04 64                	add    al,0x64
+ 104:	b0 64                	mov    al,0x64
+ 106:	04 32                	add    al,0x32
+ 108:	b0 05                	mov    al,0x5
+ 10a:	2c 05                	sub    al,0x5
+ 10c:	b0 03                	mov    al,0x3
+ 10e:	2c 07                	sub    al,0x7
+ 110:	c3                   	ret    

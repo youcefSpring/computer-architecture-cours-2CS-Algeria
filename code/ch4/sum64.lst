@@ -1,0 +1,28 @@
+  401000:	48 31 c0             	xor    rax,rax
+  401003:	48 31 c9             	xor    rcx,rcx
+  401006:	48 03 04 cd 00 20 40 	add    rax,QWORD PTR [rcx*8+0x402000]
+  40100d:	00 
+  40100e:	48 ff c1             	inc    rcx
+  401011:	48 83 f9 05          	cmp    rcx,0x5
+  401015:	7c ef                	jl     401006 <again>
+  401017:	e8 0c 00 00 00       	call   401028 <print_dec>
+  40101c:	48 c7 c0 3c 00 00 00 	mov    rax,0x3c
+  401023:	48 31 ff             	xor    rdi,rdi
+  401026:	0f 05                	syscall 
+  401028:	48 8d 35 0d 10 00 00 	lea    rsi,[rip+0x100d]        # 40203c <__bss_start+0x14>
+  40102f:	c6 06 0a             	mov    BYTE PTR [rsi],0xa
+  401032:	48 c7 c3 0a 00 00 00 	mov    rbx,0xa
+  401039:	48 c7 c1 01 00 00 00 	mov    rcx,0x1
+  401040:	48 31 d2             	xor    rdx,rdx
+  401043:	48 f7 f3             	div    rbx
+  401046:	80 c2 30             	add    dl,0x30
+  401049:	48 ff ce             	dec    rsi
+  40104c:	88 16                	mov    BYTE PTR [rsi],dl
+  40104e:	48 ff c1             	inc    rcx
+  401051:	48 85 c0             	test   rax,rax
+  401054:	75 ea                	jne    401040 <divide>
+  401056:	48 c7 c0 01 00 00 00 	mov    rax,0x1
+  40105d:	48 c7 c7 01 00 00 00 	mov    rdi,0x1
+  401064:	48 89 ca             	mov    rdx,rcx
+  401067:	0f 05                	syscall 
+  401069:	c3                   	ret    

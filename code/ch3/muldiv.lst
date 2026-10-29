@@ -1,0 +1,10 @@
+ 100:	b0 0c                	mov    al,0xc
+ 102:	b3 0b                	mov    bl,0xb
+ 104:	f6 e3                	mul    bl
+ 106:	b8 2c 01             	mov    ax,0x12c
+ 109:	b9 f4 01             	mov    cx,0x1f4
+ 10c:	f7 e1                	mul    cx
+ 10e:	b8 2f 00             	mov    ax,0x2f
+ 111:	b3 05                	mov    bl,0x5
+ 113:	f6 f3                	div    bl
+ 115:	c3                   	ret    

@@ -1,0 +1,656 @@
+\chapter{التنظيم العام للوحدة المركزية للحاسوب}
+
+\begin{khulasa}[: ماذا سنتعلم في هذا الفصل؟]
+\begin{itemize}
+    \item ما الحاسوب، وكيف تطوّر عبر التاريخ.
+    \item المكونات الأساسية: المعالج، الذاكرة، وحدات الإدخال والإخراج.
+    \item نموذجا \textenglish{Von Neumann} و\textenglish{Harvard}، والفرق بينهما.
+    \item أنواع الذاكرة، وكيف نحسب سعتها.
+    \item الحافلات الثلاث: حافلة المعطيات، حافلة العناوين، حافلة التحكم.
+\end{itemize}
+\end{khulasa}
+
+%================================================
+\section{ما الحاسوب؟}
+%================================================
+
+\begin{tarif}
+    \mustalah{الحاسوب}{Ordinateur}{Computer}: آلة إلكترونية تستقبل \textbf{معطيات}،
+    وتعالجها حسب \textbf{برنامج} (قائمة من التعليمات)، ثم تعطي \textbf{نتائج}، ويمكنها أن تحفظ
+    المعطيات والنتائج.
+\end{tarif}
+
+كل ما يفعله الحاسوب يمكن تلخيصه في أربعة أفعال: \textbf{يستقبل}، \textbf{يعالج}،
+\textbf{يحفظ}، \textbf{يُخرج}.
+
+لنأخذ مثالًا بسيطًا: تستعمل تطبيق الآلة الحاسبة في حاسوبك لتحسب $25 \times 4$.
+\begin{enumerate}
+    \item \textbf{الإدخال}: تكتب \textenglish{25}، ثم \textenglish{×}، ثم \textenglish{4} بلوحة المفاتيح.
+          كل ضغطة تتحول إلى رمز رقمي يصل إلى الحاسوب.
+    \item \textbf{الحفظ المؤقت}: يحفظ الحاسوب العددين في الذاكرة، لأنه يحتاج إليهما بعد قليل.
+    \item \textbf{المعالجة}: يقرأ المعالج العددين، وينفذ تعليمة الضرب، فيحصل على \textenglish{100}.
+    \item \textbf{الإخراج}: يرسل الحاسوب النتيجة إلى الشاشة فتراها.
+\end{enumerate}
+كل برنامج تستعمله، مهما كان معقدًا (لعبة، متصفح، تطبيق صور)، هو في الحقيقة ملايين من هذه
+الخطوات الصغيرة، تُنفَّذ بسرعة كبيرة جدًا.
+
+\begin{center}
+\begin{tikzpicture}[node distance=1.4cm]
+    \node[unit=brandGreen, minimum width=2.8cm, minimum height=1.2cm] (in) {الإدخال\\{\small لوحة المفاتيح، الفأرة}};
+    \node[unit, minimum width=2.8cm, minimum height=1.2cm, left=of in] (cpu) {المعالجة\\{\small المعالج}};
+    \node[unit=brandOrange, minimum width=2.8cm, minimum height=1.2cm, left=of cpu] (out) {الإخراج\\{\small الشاشة، الطابعة}};
+    \node[unit=brandPurple, minimum width=2.8cm, minimum height=1.1cm, below=1cm of cpu] (mem) {الحفظ\\{\small الذاكرة، القرص}};
+    \draw[sahmT] (in) -- (cpu);
+    \draw[sahmT] (cpu) -- (out);
+    \draw[sahmT, <->] (cpu) -- (mem);
+\end{tikzpicture}
+\end{center}
+
+\begin{tashbih}
+    الحاسوب يشبه \textbf{مطبخ مطعم}: المكونات (الخضر، اللحم) هي \textbf{المعطيات}، والوصفة هي
+    \textbf{البرنامج}، والطباخ هو \textbf{المعالج}، والثلاجة هي \textbf{الذاكرة}، والطبق الجاهز
+    هو \textbf{النتيجة}. الطباخ لا يقرر وحده: هو ينفذ الوصفة خطوة بخطوة.
+\end{tashbih}
+
+\subsection{العتاد والبرمجيات}
+\begin{itemize}
+    \item \mustalah{العتاد}{Matériel}{Hardware}: كل ما يمكن لمسه: المعالج، الذاكرة، الشاشة، الأسلاك.
+    \item \mustalah{البرمجيات}{Logiciel}{Software}: البرامج التي تقول للعتاد ماذا يفعل:
+          نظام التشغيل، المتصفح، الألعاب.
+\end{itemize}
+في هذا المقياس ندرس \textbf{العتاد من الداخل}، ونرى كيف ينفذ البرامج.
+
+\subsection{طبقات الحاسوب}
+يمكن أن نتخيل الحاسوب طبقات بعضها فوق بعض. كل طبقة تستعمل خدمات الطبقة التي تحتها، ولا تحتاج
+أن تعرف تفاصيلها:
+
+\begin{center}
+\begin{tikzpicture}[l/.style={draw=#1, fill=#1!15, very thick, minimum width=9cm, minimum height=0.75cm, font=\small}]
+    \node[l=brandGreen] at (0,1.8) {التطبيقات: المتصفح، الألعاب، معالج النصوص};
+    \node[l=brandPurple] at (0,0.9) {نظام التشغيل: \textenglish{Windows}، \textenglish{Linux}، \textenglish{Android}};
+    \node[l=brandOrange] at (0,0) {لغة الآلة ولغة التجميع: التعليمات التي يفهمها المعالج};
+    \node[l=brandTeal] at (0,-0.9) {العتاد: المعالج، الذاكرة، الحافلات، الدارات الإلكترونية};
+    \draw[sahmT] (5,-1.1) -- (5,2) node[midway, right, font=\small] {من الآلة إلى الإنسان};
+\end{tikzpicture}
+\end{center}
+
+في هذا الدرس نشتغل على \textbf{الطبقتين السفليين}: العتاد، ولغة التجميع التي تتكلم معه مباشرة.
+
+\subsection{كيف يعمل برنامج؟}
+عندما تضغط مرتين على أيقونة برنامج، تحدث هذه المراحل:
+\begin{enumerate}
+    \item البرنامج محفوظ على \textbf{القرص} (\textenglish{SSD} أو \textenglish{HDD}) في شكل ملف من الأصفار والآحاد.
+    \item نظام التشغيل \textbf{ينسخه في الذاكرة المركزية} \textenglish{(RAM)}، لأن القرص بطيء جدًا والمعالج لا يقرأ منه مباشرة.
+    \item المعالج يقرأ التعليمات من الذاكرة \textbf{واحدة بعد الأخرى} وينفذها.
+    \item عندما تغلق البرنامج، تُحرَّر مساحته في الذاكرة لبرامج أخرى.
+\end{enumerate}
+
+%================================================
+\section{تاريخ الحواسيب باختصار}
+%================================================
+
+لم يظهر الحاسوب فجأة. هذه أهم المحطات:
+
+\begin{center}
+\begin{tikzpicture}[
+    yr/.style={circle, fill=brandTeal, minimum size=0.35cm, inner sep=0pt},
+    txt/.style={text width=2.7cm, align=center, font=\small}]
+    \draw[brandTeal, line width=3pt] (0,0) -- (-14,0);
+    \foreach \x/\y/\t/\p in {
+        0/1642/{آلة \textenglish{Pascal}\\ للجمع والطرح}/above,
+        -2/1837/{آلة \textenglish{Babbage}\\ فكرة البرنامج}/below,
+        -4/1945/{\textenglish{ENIAC}\\ مصابيح مفرغة}/above,
+        -6/1947/{اختراع\\ \textbf{الترانزستور}}/below,
+        -8/1958/{\textbf{الدارة المندمجة}\\ \textenglish{(IC)}}/above,
+        -10/1971/{أول معالج دقيق\\ \textenglish{Intel 4004}}/below,
+        -12/1978/{المعالج\\ \textenglish{Intel 8086}}/above,
+        -14/2005/{المعالجات\\ \textbf{متعددة الأنوية}}/below} {
+        \node[yr] (n) at (\x, 0) {};
+        \node[txt, \p=0.25cm of n] {\textbf{\textenglish{\y}}\\ \t};
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|c|}
+    \hline
+    \ras{الجيل} & \ras{الفترة} & \ras{التقنية الأساسية} & \ras{مثال} \\ \hline
+    الأول   & \textenglish{1945--1955} & المصابيح المفرغة & \textenglish{ENIAC} (\textenglish{30} طنًا!) \\ \hline
+    الثاني  & \textenglish{1955--1965} & الترانزستور & \textenglish{IBM 7090} \\ \hline
+    الثالث  & \textenglish{1965--1980} & الدارات المندمجة & \textenglish{IBM 360} \\ \hline
+    الرابع  & \textenglish{1980--} الآن & المعالج الدقيق (\textenglish{VLSI}) & الحاسوب الشخصي، الهاتف \\ \hline
+\end{tabular}
+\end{table}
+
+كل جيل جديد جاء بتقنية تجعل المكونات \textbf{أصغر} و\textbf{أسرع} و\textbf{أقل استهلاكًا للطاقة}:
+\begin{itemize}
+    \item \textbf{المصابيح المفرغة} كانت كبيرة، تسخن كثيرًا، وتحترق باستمرار؛ كان يجب تبديل بعضها كل يوم تقريبًا.
+    \item \textbf{الترانزستور} يقوم بالعمل نفسه (مفتاح كهربائي يفتح ويغلق)، لكنه أصغر بمئات المرات ولا يحترق.
+    \item \textbf{الدارة المندمجة} تضع آلاف الترانزستورات على قطعة صغيرة واحدة من السيليسيوم، بدل توصيلها بالأسلاك.
+    \item \textbf{المعالج الدقيق} يضع المعالج \textbf{كله} في شريحة واحدة. من هنا ولد الحاسوب الشخصي ثم الهاتف الذكي.
+\end{itemize}
+
+\begin{tarif}
+    \mustalah{قانون مور}{Loi de Moore}{Moore's law}: لاحظ \textenglish{Gordon Moore} (أحد مؤسسي \textenglish{Intel})
+    سنة 1965 أن عدد الترانزستورات في الشريحة \textbf{يتضاعف تقريبًا كل سنتين}. بقيت هذه الملاحظة صحيحة
+    لأكثر من خمسين سنة: من \textenglish{2300} ترانزستور في \textenglish{4004} إلى عشرات المليارات اليوم.
+\end{tarif}
+
+\begin{hal}
+    كان \textenglish{ENIAC} يملأ قاعة كاملة ويستهلك \textenglish{150} كيلوواط، بينما هاتفك
+    أقوى منه بملايين المرات ويعمل ببطارية صغيرة. السبب: الترانزستورات أصبحت صغيرة جدًا،
+    حتى صار المعالج الواحد يحتوي على مليارات منها.
+\end{hal}
+
+%================================================
+\section{تذكير سريع: كيف يعدّ الحاسوب؟}
+%================================================
+
+الحاسوب لا يعرف إلا حالتين كهربائيتين: \textbf{يمر التيار} أو \textbf{لا يمر}. نكتبهما
+\textenglish{1} و\textenglish{0}.
+
+\begin{tarif}
+    \begin{itemize}
+        \item \mustalah{البت}{Bit}{Bit}: أصغر وحدة معلومة، قيمته \textenglish{0} أو \textenglish{1}.
+        \item \mustalah{البايت}{Octet}{Byte}: مجموعة من \textbf{8 بتات}.
+        \item \mustalah{الكلمة}{Mot}{Word}: عدد البتات التي يعالجها المعالج مرة واحدة
+              (\textenglish{16} بتًا في المعالج \textenglish{8086}).
+    \end{itemize}
+\end{tarif}
+
+نكتب الأعداد في ثلاثة أنظمة: العشري (الأساس 10)، الثنائي (الأساس 2)، والست عشري (الأساس 16،
+أرقامه من \textenglish{0} إلى \textenglish{9} ثم \textenglish{A} إلى \textenglish{F}).
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c||c|c|c|}
+    \hline
+    \ras{عشري} & \ras{ثنائي} & \ras{ست عشري} & \ras{عشري} & \ras{ثنائي} & \ras{ست عشري} \\ \hline
+    \textenglish{0} & \textenglish{0000} & \textenglish{0} & \textenglish{8}  & \textenglish{1000} & \textenglish{8} \\ \hline
+    \textenglish{1} & \textenglish{0001} & \textenglish{1} & \textenglish{9}  & \textenglish{1001} & \textenglish{9} \\ \hline
+    \textenglish{2} & \textenglish{0010} & \textenglish{2} & \textenglish{10} & \textenglish{1010} & \textenglish{A} \\ \hline
+    \textenglish{3} & \textenglish{0011} & \textenglish{3} & \textenglish{11} & \textenglish{1011} & \textenglish{B} \\ \hline
+    \textenglish{4} & \textenglish{0100} & \textenglish{4} & \textenglish{12} & \textenglish{1100} & \textenglish{C} \\ \hline
+    \textenglish{5} & \textenglish{0101} & \textenglish{5} & \textenglish{13} & \textenglish{1101} & \textenglish{D} \\ \hline
+    \textenglish{6} & \textenglish{0110} & \textenglish{6} & \textenglish{14} & \textenglish{1110} & \textenglish{E} \\ \hline
+    \textenglish{7} & \textenglish{0111} & \textenglish{7} & \textenglish{15} & \textenglish{1111} & \textenglish{F} \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: تحويل \textenglish{2F}\textsubscript{\textenglish{H}} إلى الثنائي وإلى العشري]
+    \begin{enumerate}
+        \item كل رقم ست عشري يساوي \textbf{4 بتات}: \textenglish{2 = 0010} و\textenglish{F = 1111}.
+        \item نضعهما جنبًا إلى جنب: $\hex{2F} = \bin{0010\,1111}$.
+        \item إلى العشري: $2 \times 16 + 15 = 32 + 15 = 47$.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{khatwa}[: تحويل العدد الثنائي \textenglish{1011} إلى العشري]
+    كل بت له «وزن» هو قوة من قوى 2، تبدأ من اليمين بـ$2^0 = 1$:
+    \begin{center}
+    \begin{tabular}{|c|c|c|c|c|}
+        \hline \ras{البت} & 1 & 0 & 1 & 1 \\ \hline
+        \ras{الوزن} & $2^3 = 8$ & $2^2 = 4$ & $2^1 = 2$ & $2^0 = 1$ \\ \hline
+        \ras{البت × الوزن} & 8 & 0 & 2 & 1 \\ \hline
+    \end{tabular}
+    \end{center}
+    نجمع: $8 + 0 + 2 + 1 = 11$. إذن $\bin{1011} = 11$.
+\end{khatwa}
+
+\begin{khatwa}[: تحويل العدد العشري 13 إلى الثنائي (القسمة المتتالية على 2)]
+    \begin{enumerate}
+        \item $13 \div 2 = 6$، والباقي \textbf{1}.
+        \item $6 \div 2 = 3$، والباقي \textbf{0}.
+        \item $3 \div 2 = 1$، والباقي \textbf{1}.
+        \item $1 \div 2 = 0$، والباقي \textbf{1}. نتوقف لأن الحاصل أصبح 0.
+        \item نقرأ البواقي \textbf{من الأخير إلى الأول}: \bin{1101}. تحقق: $8 + 4 + 0 + 1 = 13$.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{tashbih}
+    لماذا نستعمل الست عشري؟ لأن العدد الثنائي طويل جدًا ومتعب للعين: \bin{1010\,1111\,0011\,0110}.
+    الست عشري يختصر كل 4 بتات في رقم واحد، فيصبح العدد \hex{AF36}. هو «الاختزال» الذي يستعمله المبرمجون
+    لكتابة الثنائي بسرعة، كما نكتب «د.» بدل «دكتور».
+\end{tashbih}
+
+\begin{intabih}
+    في لغة التجميع نكتب حرف \code{h} بعد العدد الست عشري (\code{2Fh})، وحرف \code{b} بعد العدد
+    الثنائي (\code{00101111b}). العدد دون حرف هو عدد عشري.
+\end{intabih}
+
+\subsection{وحدات قياس الذاكرة}
+\begin{center}
+\begin{tabular}{|c|c|c|}
+    \hline
+    \ras{الوحدة} & \ras{الرمز} & \ras{القيمة} \\ \hline
+    كيلوبايت  & \textenglish{KB} & $2^{10} = 1024$ بايت \\ \hline
+    ميغابايت  & \textenglish{MB} & $2^{20} = 1\,048\,576$ بايت \\ \hline
+    غيغابايت  & \textenglish{GB} & $2^{30}$ بايت (حوالي مليار) \\ \hline
+    تيرابايت  & \textenglish{TB} & $2^{40}$ بايت \\ \hline
+\end{tabular}
+\end{center}
+
+%================================================
+\section{المكونات الأساسية للحاسوب}
+%================================================
+
+داخل كل حاسوب، من أكبر خادم إلى أصغر ساعة ذكية، نجد ثلاثة أجزاء أساسية:
+
+\begin{center}
+\begin{tikzpicture}
+    \node[unit, minimum width=4cm, minimum height=2.6cm] (cpu) at (0,0) {};
+    \node[font=\bfseries] at (0, 1) {المعالج \textenglish{(CPU)}};
+    \node[unit=brandOrange, minimum width=1.6cm, font=\small] at (-0.95, 0) {\textenglish{UC}\\وحدة التحكم};
+    \node[unit=brandGreen, minimum width=1.6cm, font=\small] at (0.95, 0) {\textenglish{UAL}\\الحساب};
+    \node[draw=brandDark, fill=white, font=\small, minimum width=3.4cm] at (0,-0.9) {السجلات};
+    \node[unit=brandPurple, minimum width=3.4cm, minimum height=2.6cm] (mem) at (-6,0) {الذاكرة المركزية\\{\small \textenglish{RAM} و\textenglish{ROM}}};
+    \node[unit=brandGreen, minimum width=3.4cm, minimum height=2.6cm] (io) at (6,0) {وحدات\\الإدخال والإخراج};
+    \draw[sahmT, <->] (cpu) -- (mem);
+    \draw[sahmT, <->] (cpu) -- (io);
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}
+    \item \mustalah{المعالج}{Processeur}{Processor, CPU}: «دماغ» الحاسوب. يقرأ التعليمات وينفذها.
+    \item \mustalah{الذاكرة المركزية}{Mémoire centrale}{Main memory}: تحفظ البرنامج
+          الذي يعمل الآن ومعطياته.
+    \item \mustalah{وحدات الإدخال والإخراج}{Périphériques d'E/S}{I/O devices}: تسمح
+          للحاسوب بالتواصل مع العالم الخارجي.
+\end{enumerate}
+
+\begin{khatwa}[: رحلة حرف من لوحة المفاتيح إلى الشاشة]
+    تضغط على المفتاح \textenglish{A} في برنامج كتابة:
+    \begin{enumerate}
+        \item لوحة المفاتيح (\textbf{إدخال}) ترسل رمز المفتاح إلى الحاسوب.
+        \item المعالج يُقاطَع (يتوقف لحظة عن عمله)، فيقرأ الرمز، ويحفظه في \textbf{الذاكرة} داخل النص الذي تكتبه.
+        \item برنامج الكتابة يطلب من المعالج «رسم» الحرف: يحسب المعالج النقاط الضوئية التي تشكّل الحرف.
+        \item هذه النقاط تُرسل إلى بطاقة الشاشة، ثم إلى الشاشة (\textbf{إخراج}).
+    \end{enumerate}
+    كل هذا يحدث في جزء صغير جدًا من الثانية، فتشعر أن الحرف ظهر فورًا.
+\end{khatwa}
+
+\begin{tarif}
+    \mustalah{الوحدة المركزية}{Unité centrale}{Central unit}: المعالج مع الذاكرة المركزية.
+    هي الجزء الذي ينفذ البرامج فعلًا.
+\end{tarif}
+
+%================================================
+\section{النموذجان الأساسيان: فون نيومان وهارفارد}
+%================================================
+
+\subsection{نموذج فون نيومان \textenglish{(Von Neumann)}}
+
+في سنة 1945 اقترح العالم \textenglish{John von Neumann} فكرة بسيطة وعبقرية: نحفظ
+\textbf{البرنامج} و\textbf{المعطيات} معًا في \textbf{الذاكرة نفسها}. قبل ذلك، كان تغيير البرنامج
+يتطلب إعادة توصيل الأسلاك يدويًا!
+
+حسب فون نيومان، يتكون الحاسوب من \textbf{خمس وحدات}: وحدة الإدخال، وحدة الإخراج، الذاكرة، وحدة
+الحساب والمنطق، ووحدة التحكم. والفكرة الأهم هي \mustalah{البرنامج المخزَّن}{Programme enregistré}{Stored program}:
+التعليمات أعداد مثل المعطيات تمامًا، فنستطيع أن نحفظها في الذاكرة نفسها، ونقرأها ونغيّرها بالطريقة نفسها.
+
+\begin{center}
+\begin{tikzpicture}
+    \node[unit, minimum width=4.2cm, minimum height=2.4cm] (cpu) at (0,0) {};
+    \node[font=\bfseries] at (0,0.85) {المعالج};
+    \node[unit=brandOrange, font=\small, minimum width=1.7cm] at (-1,-0.15) {وحدة التحكم};
+    \node[unit=brandGreen, font=\small, minimum width=1.7cm] at (1,-0.15) {\textenglish{UAL}};
+    \node[unit=brandPurple, minimum width=4.2cm, minimum height=2.4cm, align=center] (mem) at (-7,0) {};
+    \node[font=\bfseries] at (-7,0.85) {ذاكرة واحدة};
+    \node[draw=brandDark, fill=brandTeal!20, font=\small, minimum width=3.4cm] at (-7,0.1) {البرنامج (التعليمات)};
+    \node[draw=brandDark, fill=brandOrange!20, font=\small, minimum width=3.4cm] at (-7,-0.6) {المعطيات};
+    \draw[brandDark, line width=5pt, -{Stealth[length=4mm]}] (-4.8,0) -- (-2.2,0);
+    \draw[brandDark, line width=5pt, -{Stealth[length=4mm]}] (-2.2,0) -- (-4.8,0);
+    \node[font=\small, above] at (-3.5,0.2) {حافلة واحدة};
+    \node[unit=brandGreen, minimum width=2.6cm, minimum height=1.2cm] (io) at (5,0) {الإدخال\\والإخراج};
+    \draw[sahmT, <->] (cpu) -- (io);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{ميزته}: بسيط ومرن. نغيّر البرنامج بمجرد تحميل برنامج آخر في الذاكرة.
+    \item \textbf{عيبه}: حافلة واحدة للتعليمات والمعطيات، فلا يمكن قراءة تعليمة ومعطاة في
+          اللحظة نفسها. هذا الاختناق يسمى \mustalah{عنق زجاجة فون نيومان}{Goulot de Von Neumann}{Von Neumann bottleneck}.
+\end{itemize}
+
+\begin{tashbih}
+    تخيّل مكتبة لها \textbf{باب واحد ضيق}: الطلبة الذين يدخلون لإرجاع الكتب (المعطيات) والذين يدخلون
+    لأخذ التعليمات (البرنامج) يمرون كلهم من الباب نفسه، واحدًا واحدًا. مهما كان الموظفون سريعين في
+    الداخل، يبقى الباب هو ما يحدد السرعة. هذا هو عنق الزجاجة.
+\end{tashbih}
+
+\subsection{نموذج هارفارد \textenglish{(Harvard)}}
+
+في هذا النموذج نستعمل \textbf{ذاكرتين منفصلتين}: واحدة للتعليمات وأخرى للمعطيات،
+ولكل واحدة حافلتها الخاصة.
+
+\begin{center}
+\begin{tikzpicture}
+    \node[unit, minimum width=3.4cm, minimum height=2.2cm] (cpu) at (0,0) {المعالج};
+    \node[unit=brandTeal, minimum width=3.6cm, minimum height=1.6cm] (im) at (-6.5,0) {ذاكرة التعليمات\\{\small البرنامج}};
+    \node[unit=brandOrange, minimum width=3.6cm, minimum height=1.6cm] (dm) at (6.5,0) {ذاكرة المعطيات\\{\small المتغيرات}};
+    \draw[tealDeep, line width=4pt, -{Stealth[length=4mm]}] (im) -- (cpu) node[midway, above, font=\small, lawn=brandDark] {حافلة التعليمات};
+    \draw[orangeDeep, line width=4pt, {Stealth[length=4mm]}-{Stealth[length=4mm]}] (cpu) -- (dm) node[midway, above, font=\small, lawn=brandDark] {حافلة المعطيات};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{ميزته}: أسرع، لأن المعالج يقرأ التعليمة التالية ويقرأ المعطاة في الوقت نفسه.
+    \item \textbf{عيبه}: أعقد وأغلى، والمساحة المخصصة لكل ذاكرة ثابتة.
+\end{itemize}
+
+\begin{tashbih}
+    في نموذج هارفارد للمكتبة \textbf{بابان}: باب لأخذ التعليمات، وباب للمعطيات. الطابوران يتقدمان في
+    الوقت نفسه، فيمر الناس أسرع. لكن بناء بابين أغلى، وإذا امتلأ أحد الجانبين لا نستطيع استعمال مساحة الجانب الآخر.
+\end{tashbih}
+
+\subsection{مقارنة واستعمالات}
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3cm}|C|C|}
+    \hline
+    \ras{} & \ras{فون نيومان} & \ras{هارفارد} \\ \hline
+    الذاكرة   & واحدة للبرنامج والمعطيات & ذاكرتان منفصلتان \\ \hline
+    الحافلات  & حافلة واحدة مشتركة & حافلتان مستقلتان \\ \hline
+    السرعة    & أبطأ (عنق الزجاجة) & أسرع (قراءتان معًا) \\ \hline
+    التعقيد   & بسيط ورخيص & أعقد وأغلى \\ \hline
+    الاستعمال & الحواسيب الشخصية، الخوادم & المتحكمات الدقيقة (\textenglish{Arduino})، معالجات الإشارة \textenglish{(DSP)} \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{hal}
+    المعالجات الحديثة في حاسوبك تجمع بين النموذجين: الذاكرة الرئيسية \textenglish{(RAM)} واحدة
+    (فون نيومان)، لكن داخل المعالج توجد ذاكرتان صغيرتان سريعتان منفصلتان: واحدة للتعليمات
+    وأخرى للمعطيات (هارفارد). نسمي ذلك \textbf{هارفارد المعدّل}، وسنعود إليه في الفصل الخامس.
+\end{hal}
+
+%================================================
+\section{المعالج: الدور والمكونات}
+%================================================
+
+\begin{tarif}
+    \mustalah{المعالج}{Processeur, UCT}{CPU}: الدارة التي تنفذ تعليمات البرنامج واحدة تلو الأخرى.
+\end{tarif}
+
+يتكون المعالج من ثلاثة أجزاء رئيسية (سندرسها بالتفصيل في الفصل الثاني):
+
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{4.2cm}|R|R|}
+    \hline
+    \ras{الجزء} & \ras{دوره} & \ras{التشبيه} \\ \hline
+    وحدة التحكم \textenglish{(UC)} & تقرأ التعليمة، تفهمها، وتعطي الأوامر لباقي الأجزاء & قائد الأوركسترا \\ \hline
+    وحدة الحساب والمنطق \textenglish{(UAL)} & تنفذ العمليات الحسابية (\textenglish{+ −}) والمنطقية (و، أو) & الآلة الحاسبة \\ \hline
+    السجلات \textenglish{(Registres)} & ذاكرة صغيرة جدًا وسريعة جدًا داخل المعالج & ورقة المسودة على المكتب \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{الساعة وسرعة المعالج}
+يعمل المعالج على إيقاع \mustalah{ساعة}{Horloge}{Clock} ترسل نبضات منتظمة. في كل نبضة يتقدم
+المعالج خطوة صغيرة في عمله.
+
+\begin{tarif}
+    \textbf{التردد} $f$: عدد النبضات في الثانية، ويقاس بالهرتز \textenglish{(Hz)}.
+    \textbf{الدورة} $T$: مدة نبضة واحدة، و$T = \dfrac{1}{f}$.
+\end{tarif}
+
+\begin{khatwa}[: معالج تردده \textenglish{3 GHz}]
+    \begin{enumerate}
+        \item $f = 3\ \text{GHz} = 3 \times 10^{9}$ نبضة في الثانية.
+        \item $T = \dfrac{1}{3 \times 10^{9}} \approx 0.33 \times 10^{-9}$ ثانية، أي حوالي
+              \textenglish{0.33} نانوثانية.
+        \item في الوقت الذي ترمش فيه عينك (\textenglish{0.1} ثانية تقريبًا) يقوم هذا المعالج بـ
+              \textenglish{300} مليون دورة!
+    \end{enumerate}
+\end{khatwa}
+
+\begin{intabih}
+    التردد وحده لا يحدد سرعة المعالج. ما يهمنا هو \textbf{عدد التعليمات المنفذة في الثانية}.
+    معالج بـ\textenglish{3 GHz} يحتاج 4 دورات لكل تعليمة ينفذ $\frac{3 \times 10^9}{4} = 750$ مليون تعليمة
+    في الثانية، بينما معالج بـ\textenglish{2 GHz} ينفذ تعليمتين في كل دورة ينفذ $4 \times 10^9$ تعليمة، فهو
+    أسرع رغم أن تردده أقل.
+\end{intabih}
+
+%================================================
+\section{الذاكرة}
+%================================================
+
+\subsection{كيف تبدو الذاكرة من الداخل؟}
+نتخيل الذاكرة مثل \textbf{عمارة كبيرة من الصناديق}. لكل صندوق رقم يسمى \textbf{العنوان}،
+وفي كل صندوق نحفظ \textbf{بايتًا واحدًا}.
+
+\begin{center}
+\begin{tikzpicture}[cellx/.style={draw=brandDark, fill=white, minimum width=2.4cm, minimum height=0.6cm, font=\codefont},
+    addr/.style={font=\codefont\small, lawn=tealDeep}]
+    \foreach \a/\v [count=\i from 0] in {0000/3A, 0001/FF, 0002/07, 0003/41, 0004/00} {
+        \node[cellx] (c\i) at (0, -0.6*\i) {\textenglish{\v}};
+        \node[addr, right=0.2cm of c\i] {\textenglish{\a}};
+    }
+    \node[font=\small\bfseries] at (2.15, 0.6) {العنوان};
+    \node[font=\small\bfseries] at (0, 0.6) {المحتوى};
+    \node[font=\small, text width=6.5cm, align=right] at (-5.5,-1.2)
+        {العنوان \textenglish{0003} يحتوي على \textenglish{41}\textsubscript{\textenglish{H}}.\\
+         العنوان لا يتغير أبدًا، أما المحتوى فيمكن تغييره.};
+\end{tikzpicture}
+\end{center}
+
+\begin{tashbih}
+    العنوان يشبه \textbf{رقم المنزل} في شارع، والمحتوى يشبه \textbf{الشخص الذي يسكن فيه}.
+    رقم المنزل ثابت، أما السكان فيمكن أن يتغيروا.
+\end{tashbih}
+
+\subsection{عمليتان فقط: القراءة والكتابة}
+\begin{itemize}
+    \item \textbf{القراءة}: يرسل المعالج عنوانًا، فتعيد الذاكرة المحتوى (المحتوى لا يتغير).
+    \item \textbf{الكتابة}: يرسل المعالج عنوانًا ومعطاة، فتحفظ الذاكرة المعطاة مكان القديمة.
+\end{itemize}
+
+\begin{mithal}
+    الخانة \textenglish{0002} تحتوي على \hex{07}. ينفذ المعالج «اكتب \hex{55} في \textenglish{0002}».
+    بعدها تحتوي الخانة على \hex{55}، و\hex{07} ضاعت نهائيًا. لهذا يجب أن ننتبه أين نكتب: الكتابة
+    في المكان الخطأ تمحو معطيات مهمة.
+\end{mithal}
+
+\begin{tarif}
+    \mustalah{ذاكرة الوصول العشوائي}{Mémoire à accès aléatoire}{Random Access Memory}: «عشوائي» هنا تعني
+    أننا نستطيع الوصول إلى \textbf{أي خانة مباشرة} وفي الزمن نفسه، دون المرور بالخانات التي قبلها، عكس
+    شريط الكاسيت القديم الذي يجب لفّه حتى نصل إلى الأغنية.
+\end{tarif}
+
+\subsection{أنواع الذاكرة}
+\begin{center}
+\begin{tikzpicture}[level distance=1.4cm,
+    level 1/.style={sibling distance=7cm},
+    level 2/.style={sibling distance=2.3cm},
+    every node/.append style={unit, font=\small, minimum width=1.9cm},
+    edge from parent/.style={draw, brandMuted, thick}]
+    \node[unit=brandDark, fill=brandDark!10] {الذاكرة المركزية}
+        child {node[unit=brandOrange] {\textenglish{RAM}\\{\scriptsize قراءة وكتابة}}
+            child {node[unit=brandOrange] {\textenglish{SRAM}\\{\scriptsize سريعة}}}
+            child {node[unit=brandOrange] {\textenglish{DRAM}\\{\scriptsize رخيصة}}}}
+        child {node[unit=brandTeal] {\textenglish{ROM}\\{\scriptsize قراءة فقط}}
+            child {node {\textenglish{PROM}}}
+            child {node {\textenglish{EPROM}}}
+            child {node {\textenglish{EEPROM}\\{\scriptsize و\textenglish{Flash}}}}};
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{2.2cm}|R|>{\centering\arraybackslash}p{2.4cm}|R|}
+    \hline
+    \ras{النوع} & \ras{الوصف} & \ras{عند انقطاع التيار} & \ras{الاستعمال} \\ \hline
+    \textenglish{SRAM} & ترانزستورات فقط، سريعة جدًا وغالية & تُمحى & الذاكرة المخبئية داخل المعالج \\ \hline
+    \textenglish{DRAM} & مكثّف صغير لكل بت، يجب «تنشيطه» باستمرار & تُمحى & الذاكرة الرئيسية (شرائط \textenglish{RAM}) \\ \hline
+    \textenglish{ROM}  & تُكتب مرة واحدة في المصنع & تبقى & برامج الإقلاع القديمة \\ \hline
+    \textenglish{EPROM} & تُمحى بالأشعة فوق البنفسجية ثم تُعاد كتابتها & تبقى & النماذج الأولية \\ \hline
+    \textenglish{EEPROM / Flash} & تُمحى كهربائيًا & تبقى & \textenglish{BIOS/UEFI}، المفاتيح \textenglish{USB}، \textenglish{SSD} \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{tashbih}
+    \textbf{\textenglish{SRAM}} مثل مفتاح الضوء: يبقى في وضعه (مشتعل أو مطفأ) ما دام التيار موجودًا.
+    أما \textbf{\textenglish{DRAM}} فمثل كأس فيه ثقب صغير: الماء (الشحنة الكهربائية) يتسرب ببطء، فيجب إعادة ملئه
+    آلاف المرات في الثانية. هذه العملية تسمى \textbf{التنشيط} \textenglish{(refresh)}. لكن الكأس أصغر بكثير من المفتاح،
+    لذلك نستطيع وضع مليارات منها في شريط ذاكرة رخيص.
+\end{tashbih}
+
+\begin{hal}
+    لماذا يحتاج الحاسوب إلى \textenglish{ROM} أو \textenglish{Flash}؟ عند تشغيله تكون \textenglish{RAM} فارغة تمامًا.
+    يجب أن يجد المعالج برنامجًا أول يبدأ به: برنامج الإقلاع (\textenglish{BIOS} أو \textenglish{UEFI})، المحفوظ في
+    ذاكرة لا تُمحى. هذا البرنامج يفحص العتاد، ثم يبحث عن نظام التشغيل على القرص ويحمّله في \textenglish{RAM}.
+\end{hal}
+
+\begin{tarif}
+    ذاكرة \mustalah{متطايرة}{Volatile}{Volatile} تفقد محتواها عند انقطاع التيار (\textenglish{RAM})،
+    وذاكرة \mustalah{غير متطايرة}{Non volatile}{Non-volatile} تحتفظ به (\textenglish{ROM}، \textenglish{Flash}).
+\end{tarif}
+
+\subsection{حساب سعة الذاكرة}
+إذا كان للمعالج $n$ خطًا (سلكًا) للعنوان، فيمكنه أن يكتب $2^n$ عنوانًا مختلفًا.
+
+\begin{tarif}
+    $\text{عدد الخانات} = 2^{n}$ \qquad و\qquad
+    $\text{السعة} = 2^{n} \times \text{حجم الخانة}$
+\end{tarif}
+
+\begin{khatwa}[: سعة ذاكرة المعالج \textenglish{8086}]
+    للمعالج \textenglish{8086} حافلة عناوين من \textbf{20 بتًا}، وكل خانة تحتوي على بايت واحد.
+    \begin{enumerate}
+        \item عدد العناوين: $2^{20}$.
+        \item $2^{20} = 2^{10} \times 2^{10} = 1024 \times 1024 = 1\,048\,576$ عنوانًا.
+        \item السعة $= 2^{20} \times 1$ بايت $= 1$ ميغابايت \textenglish{(1 MB)}.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{khatwa}[: كم خطًا للعنوان نحتاج لذاكرة \textenglish{64 KB}؟]
+    \begin{enumerate}
+        \item $64\ \text{KB} = 64 \times 1024 = 2^{6} \times 2^{10} = 2^{16}$ بايت.
+        \item إذن $2^{n} = 2^{16}$، أي $n = 16$ خطًا.
+    \end{enumerate}
+\end{khatwa}
+
+%================================================
+\section{الحافلات}
+%================================================
+
+\begin{tarif}
+    \mustalah{الحافلة}{Bus}{Bus}: مجموعة من الأسلاك المتوازية، تنقل المعلومات بين المعالج
+    والذاكرة ووحدات الإدخال والإخراج. كل سلك ينقل بتًا واحدًا في كل مرة.
+\end{tarif}
+
+\begin{center}
+\begin{tikzpicture}
+    \node[unit, minimum width=2.8cm, minimum height=4cm] (cpu) at (5,0) {المعالج};
+    \node[unit=brandPurple, minimum width=2.6cm, minimum height=1.2cm] (mem) at (0,2.6) {الذاكرة};
+    \node[unit=brandGreen, minimum width=2.6cm, minimum height=1.2cm] (io) at (-4,2.6) {الإدخال\\والإخراج};
+    % buses
+    \draw[brandOrange, line width=5pt] (3.6,0.9) -- (-6,0.9);
+    \draw[brandTeal!80!black, line width=5pt] (3.6,0) -- (-6,0);
+    \draw[brandMuted, line width=5pt] (3.6,-0.9) -- (-6,-0.9);
+    \node[font=\small\bfseries, lawn=orangeDeep, anchor=east] at (-6.1,0.9) {حافلة العناوين};
+    \node[font=\small\bfseries, lawn=tealDeep, anchor=east] at (-6.1,0) {حافلة المعطيات};
+    \node[font=\small\bfseries, lawn=brandMuted, anchor=east] at (-6.1,-0.9) {حافلة التحكم};
+    \foreach \x/\n in {0/mem, -4/io} {
+        \draw[brandOrange, line width=2pt, -{Stealth}] (\x-0.6,0.9) -- (\x-0.6,1.95);
+        \draw[brandTeal!80!black, line width=2pt, {Stealth}-{Stealth}] (\x,0) -- (\x,1.95);
+        \draw[brandMuted, line width=2pt, {Stealth}-{Stealth}] (\x+0.6,-0.9) -- (\x+0.6,1.95);
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3cm}|>{\centering\arraybackslash}p{2.6cm}|R|}
+    \hline
+    \ras{الحافلة} & \ras{الاتجاه} & \ras{ماذا تنقل؟} \\ \hline
+    \textbf{العناوين} \textenglish{(Address bus)} & من المعالج فقط & رقم الخانة التي يريد المعالج قراءتها أو الكتابة فيها \\ \hline
+    \textbf{المعطيات} \textenglish{(Data bus)} & في الاتجاهين & القيمة المقروءة أو المكتوبة \\ \hline
+    \textbf{التحكم} \textenglish{(Control bus)} & في الاتجاهين & إشارات مثل: قراءة \textenglish{(RD)}، كتابة \textenglish{(WR)}، الساعة، المقاطعة \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{tashbih}
+    تخيّل أنك تطلب طردًا من مكتب البريد: \textbf{العنوان} يخبر الموظف أي رف يقصد (حافلة العناوين)،
+    و\textbf{الطرد} نفسه هو المعطاة (حافلة المعطيات)، وكلمة «أعطني» أو «خذ» هي إشارة التحكم
+    (قراءة أو كتابة).
+\end{tashbih}
+
+\begin{khatwa}[: المعالج يقرأ الخانة \textenglish{0003}]
+    \begin{enumerate}
+        \item يضع المعالج العنوان \textenglish{0003} على \textbf{حافلة العناوين}.
+        \item يرسل إشارة \textbf{قراءة} \textenglish{(RD)} على \textbf{حافلة التحكم}.
+        \item تضع الذاكرة محتوى الخانة (\hex{41}) على \textbf{حافلة المعطيات}.
+        \item يأخذ المعالج القيمة \hex{41} ويحفظها في أحد سجلاته.
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{عرض الحافلات}
+\begin{itemize}
+    \item \textbf{عرض حافلة العناوين} يحدد \textbf{سعة الذاكرة القصوى}: $n$ خطًا تعطي $2^n$ عنوانًا.
+    \item \textbf{عرض حافلة المعطيات} يحدد \textbf{كم بتًا ننقل في كل مرة}: حافلة من 16 بتًا
+          تنقل بايتين في المرة الواحدة.
+\end{itemize}
+
+\begin{khatwa}[: نقل 1000 بايت بحافلات مختلفة]
+    \begin{enumerate}
+        \item حافلة معطيات من \textbf{8 بتات} تنقل بايتًا واحدًا في كل مرة: نحتاج إلى $1000$ عملية نقل.
+        \item حافلة من \textbf{16 بتًا} تنقل بايتين: $1000 \div 2 = 500$ عملية.
+        \item حافلة من \textbf{64 بتًا} تنقل 8 بايتات: $1000 \div 8 = 125$ عملية فقط.
+    \end{enumerate}
+    كلما كانت الحافلة أعرض، انتقلت المعطيات أسرع، كما يمر عدد أكبر من السيارات في طريق سيّار
+    من 8 مسالك مقارنة بطريق من مسلك واحد.
+\end{khatwa}
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+    \hline
+    \ras{المعالج} & \ras{حافلة المعطيات} & \ras{حافلة العناوين} & \ras{الذاكرة القصوى} \\ \hline
+    \textenglish{Intel 8086} & 16 بتًا & 20 بتًا & \textenglish{$2^{20}$ = 1 MB} \\ \hline
+    \textenglish{Intel 80386} & 32 بتًا & 32 بتًا & \textenglish{$2^{32}$ = 4 GB} \\ \hline
+    \textenglish{x86-64} الحديث & 64 بتًا & 48 بتًا (عمليًا) & \textenglish{$2^{48}$ = 256 TB} \\ \hline
+\end{tabular}
+\end{center}
+
+%================================================
+\section{تمارين}
+%================================================
+
+\begin{tamrin}
+    حوّل الأعداد الآتية: (أ) \hex{3C} إلى العشري والثنائي. (ب) العدد العشري 200 إلى الست عشري.
+\end{tamrin}
+\begin{hall}
+    (أ) $\hex{3C} = 3 \times 16 + 12 = 60$، وبالثنائي $\bin{0011\,1100}$.\\
+    (ب) $200 = 12 \times 16 + 8$، والرقم 12 يُكتب \textenglish{C}، إذن $200 = $ \hex{C8}.
+\end{hall}
+
+\begin{tamrin}
+    معالج له حافلة عناوين من 24 بتًا، وكل خانة ذاكرة تحتوي على بايت. ما السعة القصوى للذاكرة؟
+\end{tamrin}
+\begin{hall}
+    $2^{24} = 2^{4} \times 2^{20} = 16 \times 1\ \text{MB} = 16\ \text{MB}$.
+\end{hall}
+
+\begin{tamrin}
+    نريد ذاكرة سعتها \textenglish{4 GB}. كم خطًا تحتاج حافلة العناوين؟
+\end{tamrin}
+\begin{hall}
+    $4\ \text{GB} = 2^{2} \times 2^{30} = 2^{32}$ بايت، إذن نحتاج إلى \textbf{32 خطًا}.
+\end{hall}
+
+\begin{tamrin}
+    أجب بصحيح أو خطأ مع التعليل:
+    (أ) في نموذج فون نيومان، يُحفظ البرنامج في ذاكرة مختلفة عن المعطيات.
+    (ب) حافلة العناوين تنقل المعلومات في الاتجاهين.
+    (ج) ذاكرة \textenglish{DRAM} تحتفظ بمحتواها بعد إطفاء الحاسوب.
+\end{tamrin}
+\begin{hall}
+    (أ) \textbf{خطأ}: في نموذج فون نيومان ذاكرة واحدة للبرنامج والمعطيات؛ الفصل خاصية نموذج هارفارد.\\
+    (ب) \textbf{خطأ}: المعالج وحده يرسل العناوين، فهي في اتجاه واحد.\\
+    (ج) \textbf{خطأ}: \textenglish{DRAM} ذاكرة متطايرة، تُمحى عند انقطاع التيار.
+\end{hall}
+
+\begin{tamrin}
+    معالج تردده \textenglish{2 GHz}، وتحتاج كل تعليمة في المتوسط إلى 4 دورات. كم تعليمة ينفذ في الثانية؟
+\end{tamrin}
+\begin{hall}
+    عدد الدورات في الثانية $= 2 \times 10^{9}$. عدد التعليمات $= \dfrac{2 \times 10^{9}}{4} = 0.5 \times 10^{9}$،
+    أي \textbf{500 مليون تعليمة في الثانية}.
+\end{hall}

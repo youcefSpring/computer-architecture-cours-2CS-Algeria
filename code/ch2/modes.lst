@@ -1,0 +1,8 @@
+ 100:	b8 05 00             	mov    ax,0x5
+ 103:	89 c3                	mov    bx,ax
+ 105:	8b 0e 17 01          	mov    cx,WORD PTR ds:0x117
+ 109:	8d 36 17 01          	lea    si,ds:0x117
+ 10d:	8b 14                	mov    dx,WORD PTR [si]
+ 10f:	bf 04 00             	mov    di,0x4
+ 112:	8b 85 19 01          	mov    ax,WORD PTR [di+0x119]
+ 116:	c3                   	ret    

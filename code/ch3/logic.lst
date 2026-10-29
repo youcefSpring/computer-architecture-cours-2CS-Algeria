@@ -1,0 +1,11 @@
+ 100:	b0 b6                	mov    al,0xb6
+ 102:	24 0f                	and    al,0xf
+ 104:	0c 80                	or     al,0x80
+ 106:	34 ff                	xor    al,0xff
+ 108:	f6 d0                	not    al
+ 10a:	b3 05                	mov    bl,0x5
+ 10c:	d0 e3                	shl    bl,1
+ 10e:	d0 e3                	shl    bl,1
+ 110:	d0 eb                	shr    bl,1
+ 112:	31 c9                	xor    cx,cx
+ 114:	c3                   	ret    
