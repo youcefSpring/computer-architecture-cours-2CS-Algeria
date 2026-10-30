@@ -48,4 +48,26 @@ cd tex && tectonic -o .. main.tex && mv ../main.pdf ../Computer_Architecture.pdf
 - `fonts/`: الخطوط (Amiri و AlBattar).
 
 </div>
+
+## English edition (`en/`)
+
+The same course in simple English, with the same verified programs and measurements.
+
+| File | Content |
+|---|---|
+| `en/Computer_Architecture_EN.pdf` | A4 book, 98 pages, 5 chapters + appendices |
+| `en/slides/ch1_slides.pdf` | Ch. 1: General organization of the central unit (23 slides) |
+| `en/slides/ch2_slides.pdf` | Ch. 2: Inside the processor (23 slides) |
+| `en/slides/ch3_slides.pdf` | Ch. 3: The Intel 8086 (27 slides) |
+| `en/slides/ch4_slides.pdf` | Ch. 4: 32-bit and 64-bit processors (22 slides) |
+| `en/slides/ch5_slides.pdf` | Ch. 5: Modern processor architectures (20 slides) |
+
+```bash
+cd en/tex && tectonic -o .. main.tex && mv ../main.pdf ../Computer_Architecture_EN.pdf
+cd en/slides && for i in 1 2 3 4 5; do tectonic ch${i}_slides.tex; done
+```
+
+`en/slides/code/` holds copies of the assembly programs without end-of-line comments
+(same lines and line numbers as `code/`); the slides explain each line instead.
+
 # computer-architecture-cours-2CS-Algeria

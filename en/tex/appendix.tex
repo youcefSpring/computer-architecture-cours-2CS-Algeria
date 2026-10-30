@@ -1,0 +1,160 @@
+\appendix
+
+%================================================
+\chapter{8086 Instruction Summary}
+%================================================
+
+This appendix puts in one place all the instructions we studied in Chapter 3, so you can find them quickly while
+you write your programs. Symbols: d = destination, s = source, r = register, m = memory box.
+
+\section*{The most used DOS functions (\code{int 21h})}
+\begin{center}
+\small
+\begin{tabular}{|c|l|l|}
+    \hline
+    \ras{AH} & \ras{Function} & \ras{Inputs / outputs} \\ \hline
+    \hex{01} & read a key and show it & output in AL \\ \hline
+    \hex{02} & print a character & the character in DL \\ \hline
+    \hex{09} & print a string ending with \code{\$} & the address in DX \\ \hline
+    \hex{0A} & read a line into a buffer & the address in DX \\ \hline
+    \hex{4C} & end the program & the exit code in AL \\ \hline
+\end{tabular}
+\end{center}
+
+\section*{The instructions}
+\begin{center}
+\small\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\linewidth}{|l|X|l|}
+    \hline
+    \ras{Instruction} & \ras{Meaning} & \ras{Flags changed} \\ \hline
+    \multicolumn{3}{|c|}{\cellcolor{brandOrange!20}\textbf{Transfer}} \\ \hline
+    \code{mov d, s} & \nql{d}{s} & none \\ \hline
+    \code{xchg a, b} & swap a and b & none \\ \hline
+    \code{lea r, m} & r gets the address of m & none \\ \hline
+    \code{push s} & \nql{SP}{SP - 2}, then \nql{[SP]}{s} & none \\ \hline
+    \code{pop d} & \nql{d}{[SP]}, then \nql{SP}{SP + 2} & none \\ \hline
+    \code{in al, port}, \code{out port, al} & read from a port, write to a port & none \\ \hline
+    \multicolumn{3}{|c|}{\cellcolor{brandOrange!20}\textbf{Arithmetic}} \\ \hline
+    \code{add d, s} & \nql{d}{d + s} & all \\ \hline
+    \code{adc d, s} & \nql{d}{d + s + CF} & all \\ \hline
+    \code{sub d, s} & \nql{d}{d - s} & all \\ \hline
+    \code{sbb d, s} & \nql{d}{d - s - CF} & all \\ \hline
+    \code{inc d} & \nql{d}{d + 1} & all except CF \\ \hline
+    \code{dec d} & \nql{d}{d - 1} & all except CF \\ \hline
+    \code{neg d} & \nql{d}{-d} & all \\ \hline
+    \code{cmp a, b} & computes a - b without keeping it & all \\ \hline
+    \code{mul s} (8 bits) & \nql{AX}{AL * s} & CF, OF \\ \hline
+    \code{mul s} (16 bits) & \nql{DX:AX}{AX * s} & CF, OF \\ \hline
+    \code{div s} (8 bits) & \nql{AL}{AX / s}, \nql{AH}{AX mod s} & undefined \\ \hline
+    \code{div s} (16 bits) & \nql{AX}{DX:AX / s}, \nql{DX}{DX:AX mod s} & undefined \\ \hline
+    \multicolumn{3}{|c|}{\cellcolor{brandOrange!20}\textbf{Logic and shifts}} \\ \hline
+    \code{and}, \code{or}, \code{xor} & bit by bit operations & CF = OF = 0, ZF, SF \\ \hline
+    \code{not d} & flip all the bits & none \\ \hline
+    \code{test a, b} & \code{and} without keeping the result & like \code{and} \\ \hline
+    \code{shl d, n}, \code{shr d, n} & shift: multiply or divide by $2^n$ & CF = last bit out \\ \hline
+    \code{rol d, n}, \code{ror d, n} & rotate & CF \\ \hline
+    \multicolumn{3}{|c|}{\cellcolor{brandOrange!20}\textbf{Flow control}} \\ \hline
+    \code{jmp L} & always jump & none \\ \hline
+    \code{je}, \code{jne}, \code{jz}, \code{jnz} & depends on ZF & -- \\ \hline
+    \code{jg}, \code{jge}, \code{jl}, \code{jle} & \textbf{signed} comparison & -- \\ \hline
+    \code{ja}, \code{jae}, \code{jb}, \code{jbe} & \textbf{unsigned} comparison & -- \\ \hline
+    \code{loop L} & \nql{CX}{CX - 1}, then jump if CX $\neq 0$ & none \\ \hline
+    \code{jcxz L} & jump if CX = 0 & -- \\ \hline
+    \code{call P}, \code{ret} & call a procedure, come back from it & none \\ \hline
+    \code{int n}, \code{iret} & interrupt, come back from it & IF = TF = 0 / restored \\ \hline
+    \multicolumn{3}{|c|}{\cellcolor{brandOrange!20}\textbf{Strings}} \\ \hline
+    \code{movsb}, \code{movsw} & \nql{ES:[DI]}{DS:[SI]}, then move SI and DI forward & none \\ \hline
+    \code{rep} & repeat the instruction CX times & -- \\ \hline
+    \code{cld}, \code{std} & DF = 0 (forward), DF = 1 & DF \\ \hline
+\end{tabularx}
+\end{center}
+
+%================================================
+\chapter{EMU8086 and NASM: differences in writing}
+%================================================
+
+The programs of Chapter 3 are written for EMU8086 (a syntax close to MASM), and the programs of Chapter 4 for NASM.
+The processor is the same, but the two assemblers do not write some things the same way:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|X|l|l|}
+    \hline
+    \ras{What we want} & \ras{EMU8086 / MASM} & \ras{NASM} \\ \hline
+    address of a variable in a register & \code{lea dx, msg} or \code{mov dx, offset msg} & \code{mov dx, msg} \\ \hline
+    value of a variable & \code{mov al, x} or \code{mov al, [x]} & \code{mov al, [x]} (brackets needed) \\ \hline
+    giving the size & \code{mov byte ptr [bx], 5} & \code{mov byte [bx], 5} \\ \hline
+    a hex number & \code{0FFh} & \code{0xFF} or \code{0FFh} \\ \hline
+    a procedure & \code{p proc} \dots{} \code{p endp} & a simple label \code{p:} \\ \hline
+    a constant & \code{N equ 10} & \code{N equ 10} \\ \hline
+    an array of 10 zeros & \code{t db 10 dup(0)} & \code{t times 10 db 0} \\ \hline
+    assembling & the \emph{Emulate} button & \code{nasm -f bin prog.asm -o prog.com} \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{intabih}
+    A good habit: always write the brackets \code{[ ]} when you mean the content of memory, even in EMU8086. Your program
+    stays clear, and works with both assemblers with few changes. This is what we did in all the programs of this course.
+\end{intabih}
+
+%================================================
+\chapter{Glossary}
+%================================================
+
+\begin{center}
+\small\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{|l|l|}
+    \hline
+    \ras{English} & \ras{Français} \\ \hline
+    computer & ordinateur \\ \hline
+    processor, CPU & processeur, UCT \\ \hline
+    central unit & unité centrale \\ \hline
+    main memory & mémoire centrale \\ \hline
+    volatile memory & mémoire volatile \\ \hline
+    bus & bus \\ \hline
+    address bus / data bus / control bus & bus d'adresses / de données / de contrôle \\ \hline
+    register & registre \\ \hline
+    program counter (PC) & compteur ordinal (CO) \\ \hline
+    instruction register (IR) & registre d'instruction (RI) \\ \hline
+    memory address register (MAR) & registre d'adresse mémoire (RAM) \\ \hline
+    memory data register (MDR) & registre d'information mémoire (RIM) \\ \hline
+    accumulator & accumulateur \\ \hline
+    flag & indicateur, drapeau \\ \hline
+    arithmetic logic unit (ALU) & unité arithmétique et logique (UAL) \\ \hline
+    control unit & unité de commande (UC) \\ \hline
+    decoder / sequencer & décodeur / séquenceur \\ \hline
+    half adder / full adder & demi-additionneur / additionneur complet \\ \hline
+    two's complement & complément à deux \\ \hline
+    instruction set & jeu d'instructions \\ \hline
+    opcode & code opération \\ \hline
+    addressing mode & mode d'adressage \\ \hline
+    effective address / physical address & adresse effective / adresse physique \\ \hline
+    segment, offset & segment, déplacement \\ \hline
+    instruction cycle & cycle d'instruction \\ \hline
+    fetch, decode, execute & recherche, décodage, exécution \\ \hline
+    assembly language / assembler & langage d'assemblage / assembleur \\ \hline
+    stack & pile \\ \hline
+    procedure, subroutine & procédure, sous-programme \\ \hline
+    interrupt / interrupt vector table & interruption / table des vecteurs d'interruption \\ \hline
+    I/O port & port d'entrée/sortie \\ \hline
+    protected mode & mode protégé \\ \hline
+    flat memory model & modèle mémoire plat \\ \hline
+    pipeline / branch prediction & pipeline / prédiction de branchement \\ \hline
+    core / thread & cœur / thread, fil d'exécution \\ \hline
+    cache memory / cache line & mémoire cache / ligne de cache \\ \hline
+    hit / miss & succès / défaut \\ \hline
+    temporal and spatial locality & localité temporelle et spatiale \\ \hline
+\end{tabular}
+\end{center}
+
+\section*{References}
+\begin{enumerate}
+    \item A. S. Tanenbaum, \emph{Structured Computer Organization}, Pearson, 2012.
+    \item D. A. Patterson, J. L. Hennessy, \emph{Computer Organization and Design: The Hardware/Software Interface}, Morgan Kaufmann.
+    \item P. Zanella, Y. Ligier, E. Lazard, \emph{Architecture et technologie des ordinateurs}, 6e édition, Dunod, 2018.
+    \item B. B. Brey, \emph{The Intel Microprocessors: 8086/8088 \dots{} Core2 with 64-bit Extensions}, Pearson.
+    \item EMU8086, Microprocessor Emulator.
+    \item NASM, The Netwide Assembler: https://www.nasm.us/
+    \item MASM, Microsoft Macro Assembler reference: \\ {\small https://learn.microsoft.com/en-us/cpp/assembler/masm/}
+    \item GAS, The GNU Assembler: https://sourceware.org/binutils/docs/as/
+\end{enumerate}

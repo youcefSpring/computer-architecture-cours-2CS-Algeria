@@ -1,0 +1,680 @@
+\chapter{Inside the Processor}
+
+\begin{khulasa}[: what will we learn in this chapter?]
+\begin{itemize}
+    \item What is inside the processor, and the job of each part.
+    \item Registers and their types.
+    \item The arithmetic and logic unit: how the processor adds two numbers with logic gates, and what flags are.
+    \item The control unit: who decides what happens at each moment.
+    \item The instruction set and the addressing modes.
+    \item The steps of every instruction: fetch, decode, execute, write back.
+\end{itemize}
+\end{khulasa}
+
+%================================================
+\section{A look inside the processor}
+%================================================
+
+Let us open the processor and look inside. The figure shows a simple processor, but it has all the main
+ideas of real processors.
+
+\begin{center}
+\begin{tikzpicture}[r/.style={reg, minimum width=1.5cm},
+    bus/.style={line width=3pt, color=brandTeal!70!black},
+    link/.style={thick, color=brandTeal!70!black},
+    sig/.style={dashed, thick, color=orangeDeep, -{Stealth[length=2mm]}}]
+    \draw[brandTeal, very thick, rounded corners=8pt, fill=brandTeal!4] (-8.4,-3.3) rectangle (2.2,3.4);
+    \node[font=\bfseries, text=tealDeep, anchor=north east] at (2.1,3.35) {Processor};
+    \draw[bus] (-7.6,0) -- (1.8,0);
+    \node[font=\scriptsize, text=tealDeep] at (0.2,-0.3) {internal bus};
+    % control unit
+    \draw[orangeDeep, very thick, rounded corners=5pt, fill=brandOrange!12] (-8.1,0.5) rectangle (-4.9,3.0);
+    \node[font=\small\bfseries, text=orangeDeep] at (-6.5,2.7) {control unit (UC)};
+    \node[r] (ri) at (-6.5,2.05) {RI};
+    \node[reg, font=\scriptsize, minimum width=1.25cm] (dec) at (-7.3,1.05) {decoder};
+    \node[reg, font=\scriptsize, minimum width=1.25cm] (seq) at (-5.7,1.05) {sequencer};
+    \draw[sahm] (ri) -- (dec);
+    \draw[sahm] (dec) -- (seq);
+    \draw[link] (ri.east) -- ++(0.35,0) |- (-4.55,0.35) -- (-4.55,0);
+    \node[unit=brandPurple, font=\small] (clk) at (-5.8,3.95) {clock};
+    \draw[sahm] (clk) -- (-5.8,3.0);
+    % registers above the bus
+    \node[r] (co) at (-2.6,2.3) {CO};
+    \node[r] (ram) at (0.6,2.3) {RAM};
+    \node[r] (rim) at (0.6,1.1) {RIM};
+    \draw[sahmT] (co) -- node[above, font=\scriptsize, text=brandDark] {address} (ram);
+    \node[font=\scriptsize, text=brandMuted, anchor=west] at (-2.45,1.65) {+1 per fetch};
+    \draw[link] (co.south) ++(0,-0.15) -- (-2.6,0);
+    \draw[link] (rim.south) -- (0.6,0);
+    % ALU with two inputs, ACC under it
+    \draw[brandGreen!70!black, very thick, fill=brandGreen!20]
+        (-5.4,-0.8) -- (-3.6,-0.8) -- (-4.0,-1.9) -- (-5.0,-1.9) -- cycle;
+    \node[font=\bfseries] at (-4.5,-1.35) {UAL};
+    \node[r] (acc) at (-4.5,-2.75) {ACC};
+    \node[r, font=\small] (fl) at (-2.3,-2.75) {flags};
+    \draw[sahmT] (-4.5,-1.9) -- (acc.north) node[pos=0.5, right, font=\scriptsize, text=brandDark] {result};
+    \draw[sahmT] (-3.8,-1.6) -| (fl.north);
+    \draw[sahm] (-3.9,0) -- (-3.9,-0.8) node[pos=0.5, right, font=\scriptsize, text=brandDark] {operand 2};
+    \draw[sahm] (acc.west) -- ++(-0.9,0) |- (-6.0,-0.45) -| (-5.1,-0.8);
+    \node[font=\scriptsize] at (-6.75,-1.6) {operand 1};
+    \draw[link] (acc.south) -- (-4.5,-3.2) -- (-1.0,-3.2) -- (-1.0,0);
+    % control signals
+    \draw[sig] (seq.south) -- (-5.7,0.15);
+    \node[font=\scriptsize, text=orangeDeep] at (-7.3,0.25) {control signals};
+    % memory
+    \node[unit=brandPurple, minimum width=2cm, minimum height=4cm] (mem) at (4.4,1.2) {main\\memory};
+    \draw[sahmO] (ram.east) -- node[above, font=\scriptsize, text=brandDark] {address bus} ([yshift=1.1cm]mem.west);
+    \draw[sahmT, {Stealth[length=2.6mm]}-{Stealth[length=2.6mm]}] (rim.east) -- node[below, font=\scriptsize, text=brandDark] {data bus} ([yshift=-0.1cm]mem.west);
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{4cm}|R|}
+    \hline
+    \ras{Part} & \ras{Its job in one sentence} \\ \hline
+    CO (program counter) & keeps the address of the \textbf{next instruction} \\ \hline
+    RI (instruction register) & keeps the \textbf{current instruction} being run \\ \hline
+    RAM (memory address register) & keeps the address we send to memory \\ \hline
+    RIM (memory data register) & keeps the data coming from memory or going to it \\ \hline
+    ACC (accumulator) & keeps the result of the calculation \\ \hline
+    flags & keep information about the last result: is it zero? negative? \dots \\ \hline
+    UAL & does the arithmetic and logic operations \\ \hline
+    decoder and sequencer & understand the instruction and send the orders in the right order \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{intabih}
+    Do not mix up RAM the memory (\emph{Random Access Memory}) and RAM the register (\emph{Registre d'Adresse
+    Mémoire}) used in French books. In English this register is called \textbf{MAR}, RIM is called \textbf{MDR},
+    and CO is called \textbf{PC} (\emph{Program Counter}). In the 8086 it is called \textbf{IP}.
+    In this course we keep the French short names (CO, RI, RAM, RIM, UAL, UC) because they are used in the syllabus.
+\end{intabih}
+
+%================================================
+\section{Registers}
+%================================================
+
+\begin{tarif}
+    A \term{register}{registre}: a very small memory box (8, 16, 32 or 64 bits) \textbf{inside the processor}.
+    It is the fastest memory in the whole computer.
+\end{tarif}
+
+\begin{tashbih}
+    When you solve a maths exercise, you do not walk to the library each time you need a number! You write
+    the numbers you need on \textbf{scrap paper} in front of you. Registers are the processor's scrap paper,
+    and memory is the library.
+\end{tashbih}
+
+\subsection{Why are registers important for speed?}
+\begin{center}
+\begin{tabular}{|c|c|c|}
+    \hline
+    \ras{Place} & \ras{Access time (about)} & \ras{If one cycle took one second\dots} \\ \hline
+    register & less than 1 ns & one second \\ \hline
+    main memory (RAM) & about 80 ns & about a minute and a half \\ \hline
+    SSD disk & about 100 µs & more than a day \\ \hline
+\end{tabular}
+\end{center}
+So we keep in registers the data we use often, and we go to memory as little as possible.
+
+\subsection{Types of registers}
+\begin{enumerate}
+    \item \term{Data registers}{registres de données}: they keep the numbers we compute with (like AX, BX in the 8086).
+    \item \term{Address registers}{registres d'adresse}: they keep memory addresses (like SI, DI, SP).
+    \item \term{Control and status registers}{registres de contrôle}: they help the processor organise its work: CO, RI, and the flags register.
+\end{enumerate}
+
+\begin{mithal}[: registers at work]
+    The processor is now running the instruction at address 11, ``add ACC and the content of box 21''.
+    \begin{itemize}
+        \item CO holds 12: the address of the \textbf{next} instruction, not the current one.
+        \item RI holds the current instruction, so the control unit can read it during the whole execution.
+        \item RAM holds 21: the address we are sending to memory now.
+        \item RIM receives the content of box 21 coming from memory.
+        \item ACC holds the first number, and will receive the result.
+    \end{itemize}
+    Each register has a clear job. This is why we call them special registers, unlike the general registers
+    that the programmer uses freely.
+\end{mithal}
+
+\subsection{The flags register}
+\begin{tarif}
+    A \term{flag}{indicateur, drapeau}: one bit that the arithmetic unit sets to 1 or 0 after each
+    operation, depending on the result. We use flags later to make decisions (for example: ``if the result is zero, jump'').
+\end{tarif}
+
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{2.6cm}|R|R|}
+    \hline
+    \ras{Flag} & \ras{Becomes 1 when\dots} & \ras{Example on 8 bits} \\ \hline
+    ZF (zero) & the result is \textbf{zero} & $5 - 5 = 0$ \\ \hline
+    CF (carry) & a carry comes out of the last bit (the result is too big) & $200 + 100 = 300 > 255$ \\ \hline
+    SF (sign) & the last bit of the result is 1 (negative number) & $3 - 7 = -4$ \\ \hline
+    OF (overflow) & the result is wrong if we read the numbers as signed & $100 + 50 = 150 > 127$ \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{The difference between CF and OF}
+The same byte can be read in two ways, and the processor does not know which one the programmer means:
+\begin{itemize}
+    \item \textbf{unsigned}: values from 0 to 255.
+    \item \textbf{signed}: values from $-128$ to $+127$. The last bit (bit 7) is the sign: 1 means negative.
+\end{itemize}
+So the processor computes both flags. CF matters for unsigned numbers, and OF matters for signed numbers.
+
+\begin{khatwa}[: $100 + 50$ on 8 bits]
+    \begin{enumerate}
+        \item $100 = \bin{0110\,0100}$ and $50 = \bin{0011\,0010}$.
+        \item The sum: $\bin{1001\,0110} = 150$ (unsigned). No carry out of bit 7, so CF = 0: correct for unsigned numbers.
+        \item But bit 7 is now 1! Reading it as signed, we see a negative number: $150 - 256 = -106$.
+        \item We added two positive numbers and got a negative one: impossible, so the signed result is wrong, and OF = 1.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{intabih}
+    An easy rule for OF: overflow happens when we add two numbers \textbf{with the same sign} and get a result
+    \textbf{with the other sign}. Adding a positive and a negative number never overflows.
+\end{intabih}
+
+%================================================
+\section{The arithmetic and logic unit (UAL)}
+%================================================
+
+\begin{tarif}
+    The \term{arithmetic and logic unit}{unité arithmétique et logique, UAL} (ALU in English): the part
+    that does arithmetic (add, subtract, compare\dots) and logic (AND, OR, XOR, NOT, shifts).
+\end{tarif}
+
+\begin{center}
+\begin{tikzpicture}
+    \draw[brandGreen!70!black, very thick, fill=brandGreen!20]
+        (-2.2,1) -- (-0.4,1) -- (0,0.4) -- (0.4,1) -- (2.2,1) -- (1.2,-1) -- (-1.2,-1) -- cycle;
+    \node[font=\bfseries\large] at (0,-0.2) {UAL};
+    \draw[sahmT] (-1.3,2) node[above, font=\small] {operand A} -- (-1.3,1);
+    \draw[sahmT] (1.3,2) node[above, font=\small] {operand B} -- (1.3,1);
+    \draw[sahmO] (-3.6,0) node[left, font=\small] {operation (from the control unit)} -- (-1.7,0);
+    \draw[sahmT] (0,-1) -- (0,-2) node[below, font=\small] {result};
+    \draw[sahm] (1.6,-0.2) -- (3.4,-0.2) node[right, font=\small] {flags ZF, CF, SF, OF};
+\end{tikzpicture}
+\end{center}
+
+\subsection{How do logic gates add? The half adder}
+Let us add two bits $A$ and $B$. There are only four cases:
+
+\begin{center}
+\begin{tabular}{|c|c||c|c|}
+    \hline
+    \ras{$A$} & \ras{$B$} & \ras{sum $S$} & \ras{carry $C$} \\ \hline
+    0 & 0 & 0 & 0 \\ \hline
+    0 & 1 & 1 & 0 \\ \hline
+    1 & 0 & 1 & 0 \\ \hline
+    1 & 1 & 0 & \cell{orangeDeep}{\textbf{1}} \\ \hline
+\end{tabular}
+\end{center}
+
+We see that $S$ is 1 when exactly one bit is 1: this is the \textbf{XOR} gate.
+And $C$ is 1 when both bits are 1: this is the \textbf{AND} gate.
+
+\begin{tarif}
+    \term{Half adder}{demi-additionneur}: \quad $S = A \oplus B$ \quad and \quad $C = A \cdot B$
+\end{tarif}
+
+\begin{center}
+\begin{tikzpicture}[gate/.style={draw=brandDark, fill=white, thick, minimum width=1.5cm,
+        minimum height=0.9cm, font=\codefont\bfseries, rounded corners=2pt}]
+    \node[gate] (x) at (0,0.8) {XOR};
+    \node[gate] (a) at (0,-0.8) {AND};
+    \node[font=\bfseries] (A) at (-3.2,0.4) {A};
+    \node[font=\bfseries] (B) at (-3.2,-0.4) {B};
+    \fill (-2,0.4) circle (2pt); \fill (-1.5,-0.4) circle (2pt);
+    \draw[thick] (A) -- (-2,0.4) |- ([yshift=0.15cm]x.west);
+    \draw[thick] (-2,0.4) |- ([yshift=0.15cm]a.west);
+    \draw[thick] (B) -- (-1.5,-0.4) |- ([yshift=-0.15cm]x.west);
+    \draw[thick] (-1.5,-0.4) |- ([yshift=-0.15cm]a.west);
+    \draw[sahmT] (x.east) -- (2,0.8) node[right] {S};
+    \draw[sahmO] (a.east) -- (2,-0.8) node[right] {C};
+\end{tikzpicture}
+\end{center}
+
+\subsection{The full adder}
+To add numbers with many bits, we must also add the \textbf{incoming carry} from the previous bit.
+A full adder has three inputs: $A$, $B$ and the carry in $C_{in}$.
+
+\begin{tarif}
+    \term{Full adder}{additionneur complet}: \quad
+    $S = A \oplus B \oplus C_{in}$ \quad and \quad
+    $C_{out} = A \cdot B + C_{in} \cdot (A \oplus B)$
+\end{tarif}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c||c|c|}
+    \hline
+    \ras{$A$} & \ras{$B$} & \ras{$C_{in}$} & \ras{$S$} & \ras{$C_{out}$} \\ \hline
+    0&0&0&0&0 \\ \hline 0&0&1&1&0 \\ \hline 0&1&0&1&0 \\ \hline 0&1&1&0&1 \\ \hline
+    1&0&0&1&0 \\ \hline 1&0&1&0&1 \\ \hline 1&1&0&0&1 \\ \hline 1&1&1&1&1 \\ \hline
+\end{tabular}
+\end{center}
+
+\subsection{A 4-bit adder}
+We put 4 full adders side by side: the carry out of each one goes into the next one, exactly as we do
+when we add with pen and paper.
+
+\begin{center}
+\begin{tikzpicture}[fa/.style={draw=brandTeal, fill=brandTeal!15, very thick, minimum width=1.6cm,
+        minimum height=1.1cm, font=\codefont\bfseries, rounded corners=3pt}]
+    \foreach \i/\x in {0/0, 1/-3, 2/-6, 3/-9} {
+        \node[fa] (f\i) at (\x,0) {FA};
+        \draw[thick] ([xshift=-0.35cm]f\i.north) -- ++(0,0.6) node[above, font=\small] {A\i};
+        \draw[thick] ([xshift=0.35cm]f\i.north) -- ++(0,0.6) node[above, font=\small] {B\i};
+        \draw[sahmT] (f\i.south) -- ++(0,-0.6) node[below, font=\small] {S\i};
+    }
+    \draw[sahmO] (1.7,0) node[right, font=\small] {0} -- (f0.east);
+    \draw[sahmO] (f0.west) -- (f1.east);
+    \draw[sahmO] (f1.west) -- (f2.east);
+    \draw[sahmO] (f2.west) -- (f3.east);
+    \draw[sahmO] (f3.west) -- ++(-0.9,0) node[left, font=\small] {CF};
+\end{tikzpicture}
+\end{center}
+Bit 0 (the smallest) is on the right, like when we write numbers. The carry travels from right to left.
+
+\begin{khatwa}[: add $0111 + 0110$ (that is $7 + 6$) with the adder]
+    \begin{center}
+    \begin{tabular}{|c|c|c|c|c|c|}
+        \hline
+        \ras{Bit} & \ras{$A$} & \ras{$B$} & \ras{$C_{in}$} & \ras{$S$} & \ras{$C_{out}$} \\ \hline
+        0 & 1 & 0 & 0 & 1 & 0 \\ \hline
+        1 & 1 & 1 & 0 & 0 & 1 \\ \hline
+        2 & 1 & 1 & 1 & 1 & 1 \\ \hline
+        3 & 0 & 0 & 1 & 1 & 0 \\ \hline
+    \end{tabular}
+    \end{center}
+    Read $S$ from bit 3 down to bit 0: $1101 = 13$, which is indeed $7 + 6$. The last carry is 0, so CF = 0.
+\end{khatwa}
+
+\subsection{And subtraction? The same adder!}
+The processor does not need a special circuit to subtract. It uses the \term{two's complement}{complément à deux}:
+$A - B = A + (-B)$, and we get $-B$ by flipping all the bits of $B$, then adding 1.
+
+\begin{khatwa}[: $7 - 5$ on 4 bits]
+    \begin{enumerate}
+        \item $5 = 0101$. Flip the bits: $1010$. Add 1: $1011$. So $-5 = 1011$.
+        \item Add: $0111 + 1011 = 1\,0010$. We drop the carry out, so $0010 = 2$ is left.
+        \item The result: $7 - 5 = 2$. Correct! The same circuit added and subtracted.
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{Comparing by subtracting}
+The processor does not need a special circuit to compare either: to compare $A$ and $B$ it computes
+$A - B$ \textbf{without keeping the result}, then looks at the flags:
+\begin{itemize}
+    \item if ZF = 1 then $A = B$.
+    \item if CF = 1 (a ``borrow'' happened) then $A < B$ (for unsigned numbers).
+\end{itemize}
+
+\subsection{A real test: how do the flags change?}
+We ran the program below on the 8086. Do not worry if you do not understand all the instructions yet; we
+study them in Chapter 3. Just look at the flags.
+
+\asm{ch2/flags.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|c|c|c|}
+    \hline
+    \ras{Line} & \ras{Instruction} & \ras{AL} & \ras{CF} & \ras{ZF} & \ras{SF} & \ras{OF} \\ \hline
+    4 & \code{add al, 100} ($200 + 100$) & $\hex{2C} = 44$ & \cell{orangeDeep}{\textbf{1}} & 0 & 0 & 0 \\ \hline
+    5 & \code{mov al, 100} & $\hex{64} = 100$ & 1 & 0 & 0 & 0 \\ \hline
+    6 & \code{add al, 50} ($100 + 50$) & $\hex{96} = 150$ & 0 & 0 & 1 & \cell{orangeDeep}{\textbf{1}} \\ \hline
+    8 & \code{sub al, 5} ($5 - 5$) & $\hex{00} = 0$ & 0 & \cell{orangeDeep}{\textbf{1}} & 0 & 0 \\ \hline
+    10 & \code{sub al, 7} ($3 - 7$) & $\hex{FC} = 252$ & \cell{orangeDeep}{\textbf{1}} & 0 & \cell{orangeDeep}{\textbf{1}} & 0 \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: why did $200 + 100$ give 44?]
+    \begin{enumerate}
+        \item $200 + 100 = 300$, but AL holds only 8 bits, that is from 0 to 255.
+        \item $300 - 256 = 44$: AL keeps 44, and the ``256'' that did not fit goes into the flag CF, so CF = 1.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{intabih}
+    Look at line 5: the instruction \code{mov} \textbf{does not change the flags}, so CF stayed 1. Only
+    arithmetic and logic instructions change the flags.
+\end{intabih}
+
+%================================================
+\section{The control unit (UC)}
+%================================================
+
+\begin{tarif}
+    The \term{control unit}{unité de commande, UC}: the part that reads the instructions and understands
+    them, then sends \textbf{signals} to the other parts at each clock pulse (open this register, add, read
+    memory\dots) in the right order.
+\end{tarif}
+
+\begin{tashbih}
+    The control unit is the \textbf{orchestra conductor}: it does not play any instrument itself, but it tells
+    each musician when to start and when to stop. Without it, everybody plays at the same time and it becomes noise.
+\end{tashbih}
+
+Its main parts:
+\begin{itemize}
+    \item the \textbf{instruction register} (RI): keeps the current instruction.
+    \item the \term{decoder}{décodeur}: reads the operation code (opcode) and finds what is asked: add? move? jump?
+    \item the \term{sequencer}{séquenceur}: sends the right signals, one after the other, to the rhythm of the clock.
+\end{itemize}
+
+\subsection{Micro-operations, pulse by pulse}
+Each step of an instruction is split into very small steps called \term{micro-operations}{micro-opérations}.
+At each clock pulse, the sequencer sends signals that open ``doors'' between registers. Here is how an instruction is fetched:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|c|R|R|}
+    \hline
+    \ras{Pulse} & \ras{Micro-operation} & \ras{Signal sent by the sequencer} \\ \hline
+    T1 & \nql{RAM}{CO} & ``copy CO into RAM'' \\ \hline
+    T2 & \nql{RIM}{[RAM]}, \nql{CO}{CO + 1} & ``read memory'' and ``increase CO'' \\ \hline
+    T3 & \nql{RI}{RIM} & ``copy RIM into RI'' \\ \hline
+    T4\dots & depends on the instruction & the decoder chooses the next signals \\ \hline
+\end{tabularx}
+\end{center}
+The fetch is the same for all instructions; what comes after depends on the opcode.
+
+\subsection{Two kinds of control units}
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.2cm}|R|R|}
+    \hline
+    \ras{} & \ras{Hardwired (câblée)} & \ras{Microprogrammed (microprogrammée)} \\ \hline
+    Idea & a fixed logic circuit makes the signals & each instruction is a small program stored in an internal memory \\ \hline
+    Speed & very fast & a little slower \\ \hline
+    Changes & hard (we must change the circuit) & easy (we change the microprogram) \\ \hline
+    Found in & RISC processors & CISC processors like the 8086 \\ \hline
+\end{tabularx}
+\end{center}
+
+%================================================
+\section{The instruction set}
+%================================================
+
+\begin{tarif}
+    The \term{instruction set}{jeu d'instructions}: the list of all the instructions a processor can run.
+    Each processor family has its own set.
+\end{tarif}
+
+\subsection{The shape of an instruction}
+Every machine-language instruction has two parts:
+
+\begin{center}
+\begin{tikzpicture}
+    \node[draw=brandOrange, fill=brandOrange!20, thick, minimum width=3.5cm, minimum height=1cm, font=\bfseries] (op) at (0,0) {opcode};
+    \node[draw=brandTeal, fill=brandTeal!20, thick, minimum width=5cm, minimum height=1cm, font=\bfseries, anchor=west] (oper) at (op.east) {operands};
+    \node[below=0.15cm of op, font=\small] {what do we do?};
+    \node[below=0.15cm of oper, font=\small] {on what do we work?};
+    \node[above=0.2cm of op, font=\codefont] {ADD};
+    \node[above=0.2cm of oper, font=\codefont] {AX, 5};
+\end{tikzpicture}
+\end{center}
+
+\begin{tarif}
+    \term{Assembly language}{langage d'assemblage}: we write instructions with short words that humans
+    understand (\code{ADD}, \code{MOV}) instead of binary numbers. A program called the
+    \term{assembler}{assembleur} turns them into machine language (zeros and ones).
+\end{tarif}
+
+\begin{mithal}
+    On the 8086, the instruction \code{add al, 5} is written in machine language with the two bytes 04 05, that is
+    0000\,0100 0000\,0101: the first byte is the opcode ``add an immediate value to AL'', and the second one is the
+    number 5. The programmer writes \code{add al, 5}, and the assembler writes the zeros and ones (we see this in
+    detail in Chapter 3).
+\end{mithal}
+
+\subsection{How many instructions can a processor have?}
+If the opcode uses $k$ bits, there are $2^k$ different codes, so at most $2^k$ instructions.
+
+\begin{khatwa}
+    A 6-bit opcode: $2^6 = 64$ possible instructions. An 8-bit opcode: $2^8 = 256$ instructions.
+\end{khatwa}
+
+\subsection{Number of addresses in an instruction}
+Let us compute $A = B + C$ on four kinds of machines. The fewer operands in an instruction, the shorter the
+instruction, but the more instructions we need:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.6cm}|X|>{\centering\arraybackslash}p{3cm}|}
+    \hline
+    \ras{Kind of machine} & \ras{Program} & \ras{Instructions} \\ \hline
+    3 addresses & \code{ADD A, B, C} & 1 \\ \hline
+    2 addresses & \code{MOV A, B} then \code{ADD A, C} & 2 \\ \hline
+    1 address (accumulator) & \code{LOAD B} then \code{ADD C} then \code{STORE A} & 3 \\ \hline
+    0 address (stack) & \code{PUSH B}, \code{PUSH C}, \code{ADD}, \code{POP A} & 4 \\ \hline
+\end{tabularx}
+\end{center}
+The 8086 is a \textbf{2-address} machine: \code{add ax, bx} means $\text{AX} \leftarrow \text{AX} + \text{BX}$.
+
+\subsection{Classes of instructions}
+\begin{center}
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.5cm}|R|>{\centering\arraybackslash}p{4.2cm}|}
+    \hline
+    \ras{Class} & \ras{Job} & \ras{Examples (8086)} \\ \hline
+    data transfer & copy a value from one place to another & \code{MOV}, \code{PUSH}, \code{POP} \\ \hline
+    arithmetic & add, subtract, multiply, divide & \code{ADD}, \code{SUB}, \code{MUL}, \code{INC} \\ \hline
+    logic & operations on bits & \code{AND}, \code{OR}, \code{XOR}, \code{SHL} \\ \hline
+    flow control & jump and change the order of execution & \code{JMP}, \code{JE}, \code{CALL}, \code{RET} \\ \hline
+    input/output & talk with devices & \code{IN}, \code{OUT}, \code{INT} \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{CISC and RISC}
+\begin{itemize}
+    \item \textbf{CISC} (Complex Instruction Set Computer): many complex instructions; some do a lot of work. Example: Intel x86.
+    \item \textbf{RISC} (Reduced Instruction Set Computer): few, simple, fast instructions, all of the same length.
+          Example: ARM in phones, RISC-V.
+\end{itemize}
+
+%================================================
+\section{Addressing modes}
+%================================================
+
+\begin{tarif}
+    An \term{addressing mode}{mode d'adressage}: the way we say \textbf{where the data is} that the instruction works on.
+\end{tarif}
+
+\begin{tashbih}
+    You want to give a book to a friend:
+    \textbf{(1)} you put the book in his hand (immediate),
+    \textbf{(2)} you say: ``the book is on shelf number 12'' (direct),
+    \textbf{(3)} you say: ``look at the paper in my pocket, it has the shelf number'' (indirect),
+    \textbf{(4)} you say: ``the third shelf after shelf number 10'' (indexed).
+\end{tashbih}
+
+\subsection{The basic modes}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{2.4cm}|>{\centering\arraybackslash}p{3.3cm}|R|}
+    \hline
+    \ras{Mode} & \ras{8086 example} & \ras{Where is the data?} \\ \hline
+    immediate & \code{mov ax, 5} & inside the instruction itself \\ \hline
+    register & \code{mov bx, ax} & in a register \\ \hline
+    direct & \code{mov cx, [val]} & in memory; its address is written in the instruction \\ \hline
+    indirect & \code{mov dx, [si]} & in memory; its address is in a register \\ \hline
+    indexed & \code{mov ax, [tab+di]} & address = start address + value of an index register \\ \hline
+    relative & \code{jmp next} & address = current address + offset (for jumps) \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{When do we use each mode?}
+\begin{itemize}
+    \item \textbf{Immediate}: for constants (number of loop turns, start value). The fastest mode, because the value
+          came with the instruction, so we do not go to memory. But we cannot change it while the program runs.
+    \item \textbf{Register}: for fast calculations between values already inside the processor. Very fast too.
+    \item \textbf{Direct}: for variables that have a fixed place in memory (like a global variable). One memory read.
+    \item \textbf{Indirect}: when we do not know the address when we write the program, but compute it while it runs.
+          It is the basis of \textbf{pointers} in C.
+    \item \textbf{Indexed}: for arrays. We fix the start address and change the index at each turn of the loop, to visit every element.
+    \item \textbf{Relative}: for jumps. Because the distance is relative, the program works even if it is loaded at another place in memory.
+\end{itemize}
+
+\begin{khatwa}[: how many times do we go to memory?]
+    \begin{center}
+    \begin{tabular}{|l|c|}
+        \hline \ras{Instruction} & \ras{Memory reads to get the data} \\ \hline
+        \code{mov ax, 5} (immediate) & 0 \\ \hline
+        \code{mov ax, bx} (register) & 0 \\ \hline
+        \code{mov ax, [val]} (direct) & 1 \\ \hline
+        \code{mov ax, [si]} (indirect with a register) & 1 \\ \hline
+        memory indirect (the address itself is in memory) & 2 \\ \hline
+    \end{tabular}
+    \end{center}
+    Every trip to memory costs time, so programmers try to keep important data in registers.
+\end{khatwa}
+
+\subsection{The modes in a real program}
+\asm{ch2/modes.asm}
+
+\begin{center}
+\begin{tikzpicture}[cellx/.style={draw=brandDark, fill=white, minimum width=2cm, minimum height=0.55cm, font=\codefont\small},
+    addr/.style={font=\codefont\small, text=tealDeep}]
+    \foreach \a/\v/\n [count=\i from 0] in {0117/1234/val, 0119/000A/tab, 011B/0014/{}, 011D/001E/{}} {
+        \node[cellx] (c\i) at (0, -0.55*\i) {\v};
+        \node[addr, left=0.15cm of c\i] {\a};
+        \node[font=\codefont\small, right=0.15cm of c\i] {\n};
+    }
+    \node[font=\small\bfseries] at (0,0.55) {memory};
+    \draw[sahmO] (-2.4,-0.55) -- (-2.4,-1.65) node[midway, left, font=\scriptsize] {+4};
+\end{tikzpicture}
+\end{center}
+
+\begin{sharh}
+    \s{1}{A program of type .COM: it starts at address \hex{100}.}
+    \s{3}{\textbf{Immediate}: the number 5 is written inside the instruction. Result: AX = 0005.}
+    \s{4}{\textbf{Register}: copy AX into BX. Result: BX = 0005.}
+    \s{5}{\textbf{Direct}: read memory at the address of \code{val} (\hex{0117}). Result: CX = 1234.}
+    \s{6}{\code{lea} puts the \textbf{address} of \code{val} (not its value) into SI: SI = 0117.}
+    \s{7}{\textbf{Indirect}: read memory at the address held in SI. Result: DX = 1234.}
+    \s{8}{DI = 4: each element of \code{tab} is a word (two bytes), so the third element is 4 bytes away.}
+    \s{9}{\textbf{Indexed}: address $= \hex{0119} + 4 = \hex{011D}$, which holds 30. Result: AX = 001E.}
+    \s{10}{End of the program, back to the system.}
+\end{sharh}
+
+\begin{intabih}
+    The brackets \code{[ ]} always mean: ``the \textbf{content of memory} at this address''. \code{mov dx, si}
+    copies the number \hex{0117} itself, but \code{mov dx, [si]} reads what is stored at address \hex{0117}.
+\end{intabih}
+
+%================================================
+\section{The steps of an instruction}
+%================================================
+
+Every instruction, even a simple one, goes through the same steps. This is called the
+\term{instruction cycle}{cycle d'instruction}.
+
+\begin{center}
+\begin{tikzpicture}
+    \foreach \a/\t/\c in {90/{1. Fetch}/brandTeal, 0/{2. Decode}/brandOrange,
+                          -90/{3. Execute}/brandGreen, 180/{4. Write back}/brandPurple} {
+        \node[unit=\c, minimum width=2.9cm, minimum height=1.1cm] (n\a) at (\a:2.6) {\t};
+    }
+    \draw[sahmT] (n90) to[bend left=25] (n0);
+    \draw[sahmT] (n0) to[bend left=25] (n-90);
+    \draw[sahmT] (n-90) to[bend left=25] (n180);
+    \draw[sahmT] (n180) to[bend left=25] (n90);
+    \node[font=\small, text width=3cm, align=center] at (0,0) {then again\\with the next instruction};
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}
+    \item \textbf{Fetch}: CO is sent to RAM, memory is read, the instruction arrives in RIM, then in RI.
+          Then CO increases to point to the next instruction.
+    \item \textbf{Decode}: the decoder reads the opcode in RI and finds the operands.
+    \item \textbf{Execute}: if we need data from memory we read it, then the UAL computes the result.
+    \item \textbf{Write back}: we store the result in a register or in memory, and we update the flags.
+\end{enumerate}
+
+\subsection{A complete example, step by step}
+We take a simple machine with an accumulator ACC, and we want to compute $z = x + y$. The variable $x$
+is at address 20, $y$ at 21, and $z$ at 22.
+
+\begin{center}
+\begin{tabular}{|c|l|l|}
+    \hline
+    \ras{Address} & \ras{Content} & \ras{Meaning} \\ \hline
+    10 & \code{LOAD 20}  & $\text{ACC} \leftarrow [20]$ \\ \hline
+    11 & \code{ADD 21}   & $\text{ACC} \leftarrow \text{ACC} + [21]$ \\ \hline
+    12 & \code{STORE 22} & $[22] \leftarrow \text{ACC}$ \\ \hline
+    20 & 7 & $x$ \\ \hline
+    21 & 5 & $y$ \\ \hline
+    22 & 0 & $z$ (before running) \\ \hline
+\end{tabular}
+\end{center}
+
+We follow the second instruction \code{ADD 21} step by step (at the start, CO = 11 and ACC = 7):
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{1.6cm}|R|c|c|c|c|c|}
+    \hline
+    \ras{Step} & \ras{What happens?} & \ras{CO} & \ras{RAM} & \ras{RIM} & \ras{RI} & \ras{ACC} \\ \hline
+    fetch & \nql{RAM}{CO} & 11 & \cell{orangeDeep}{11} & -- & -- & 7 \\ \cline{2-7}
+     & read memory: \nql{RIM}{[11]} & 11 & 11 & \cell{orangeDeep}{\code{ADD 21}} & -- & 7 \\ \cline{2-7}
+     & \nql{RI}{RIM}, and \nql{CO}{CO + 1} & \cell{orangeDeep}{12} & 11 & \code{ADD 21} & \cell{orangeDeep}{\code{ADD 21}} & 7 \\ \hline
+    decode & the decoder understands: ``add the content of address 21'' & 12 & 11 & \code{ADD 21} & \code{ADD 21} & 7 \\ \hline
+    execute & \nql{RAM}{21}, then read: \nql{RIM}{[21]} & 12 & \cell{orangeDeep}{21} & \cell{orangeDeep}{5} & \code{ADD 21} & 7 \\ \cline{2-7}
+     & UAL: $7 + 5$ & 12 & 21 & 5 & \code{ADD 21} & 7 \\ \hline
+    write back & \nql{ACC}{12}, and update the flags & 12 & 21 & 5 & \code{ADD 21} & \cell{orangeDeep}{\textbf{12}} \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{khulasa}
+    After this instruction: ACC = 12 and CO = 12, so the next instruction is \code{STORE 22}, which writes 12
+    in memory, and $z$ becomes 12.
+\end{khulasa}
+
+\begin{hal}
+    Modern processors do not wait for one instruction to finish before starting the next. While one instruction
+    runs, the next one is decoded and the third one is fetched. This is the \textbf{pipeline}, which we study in Chapter 4.
+\end{hal}
+
+%================================================
+\section{Exercises}
+%================================================
+
+\begin{tamrin}
+    Compute with the full adder (bit by bit) $1011 + 0110$ on 4 bits. What is the result, and the value of CF?
+\end{tamrin}
+\begin{hall}
+    \begin{tabular}{|c|c|c|c|c|c|}
+        \hline \ras{Bit} & \ras{$A$} & \ras{$B$} & \ras{$C_{in}$} & \ras{$S$} & \ras{$C_{out}$} \\ \hline
+        0 & 1 & 0 & 0 & 1 & 0 \\ \hline 1 & 1 & 1 & 0 & 0 & 1 \\ \hline
+        2 & 0 & 1 & 1 & 0 & 1 \\ \hline 3 & 1 & 0 & 1 & 0 & 1 \\ \hline
+    \end{tabular}\\
+    The result is $0001$ and CF = 1: $11 + 6 = 17 = 16 + 1$, and the ``16'' went into CF.
+\end{hall}
+
+\begin{tamrin}
+    On 8 bits, give AL, CF and ZF after: (a) $255 + 1$ (b) $10 - 10$ (c) $10 - 20$.
+\end{tamrin}
+\begin{hall}
+    (a) $256 - 256 = 0$: AL = 0, CF = 1, ZF = 1.\\
+    (b) AL = 0, CF = 0, ZF = 1.\\
+    (c) $10 - 20 = -10$, and on 8 bits $256 - 10 = 246 = \hex{F6}$: CF = 1 (borrow), ZF = 0.
+\end{hall}
+
+\begin{tamrin}
+    Give the addressing mode of each instruction: (a) \code{mov al, [bx]} (b) \code{mov al, 10h} (c) \code{mov al, [10h]} (d) \code{mov al, bl}.
+\end{tamrin}
+\begin{hall}
+    (a) register indirect \quad (b) immediate \quad (c) direct \quad (d) register.
+\end{hall}
+
+\begin{tamrin}
+    In the example above ($z = x + y$), write the table of steps for the third instruction \code{STORE 22}.
+\end{tamrin}
+\begin{hall}
+    \textbf{Fetch}: \nql{RAM}{12}, \nql{RIM}{STORE 22}, \nql{RI}{RIM}, CO = 13.
+    \textbf{Decode}: ``write ACC at address 22''.
+    \textbf{Execute and write}: \nql{RAM}{22}, \nql{RIM}{ACC} (12), then a write signal: $[22] = 12$.
+\end{hall}

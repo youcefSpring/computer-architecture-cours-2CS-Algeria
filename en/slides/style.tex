@@ -1,0 +1,149 @@
+% Slides of the English course "Computer Architecture" (same theme as the
+% ENSB decks: light background, teal + orange). Compile from en/slides/.
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs, colortbl, tabularx, array}
+\usepackage{tikz}
+\usepackage[skins]{tcolorbox}
+\usepackage{fontawesome5}
+\usepackage{listings}
+\usepackage{fontspec}
+\usetikzlibrary{positioning, calc, arrows.meta, shapes.geometric, decorations.pathreplacing}
+
+\setsansfont{texgyreheros}[Extension=.otf, UprightFont=*-regular, BoldFont=*-bold,
+    ItalicFont=*-italic, BoldItalicFont=*-bolditalic]
+\newfontfamily\codefont[Scale=0.95, BoldFont=lmmonolt10-bold.otf,
+    ItalicFont=lmmono10-italic.otf]{lmmono10-regular.otf}
+
+\definecolor{brandTeal}{HTML}{5CC8E6}
+\definecolor{brandOrange}{HTML}{FFA27F}
+\definecolor{brandLight}{HTML}{F8F9FA}
+\definecolor{brandDark}{HTML}{263238}
+\definecolor{brandMuted}{HTML}{6C757D}
+\definecolor{brandGreen}{HTML}{7BC47F}
+\definecolor{brandPurple}{HTML}{B39DDB}
+\colorlet{tealDeep}{brandTeal!60!black}
+\colorlet{orangeDeep}{brandOrange!70!black}
+\definecolor{codeGrey}{HTML}{F1F3F5}
+
+\setbeamercolor{background canvas}{bg=brandLight}
+\setbeamercolor{normal text}{fg=brandDark}
+\setbeamercolor{structure}{fg=brandTeal}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{frametitle}{%
+    \vspace{0.35cm}
+    \noindent{\bfseries\Large\color{brandDark}\insertframetitle}\par
+    \vskip-2pt\noindent{\color{brandTeal}\rule{\textwidth}{1.5pt}}\vspace{0.05cm}}
+\setbeamertemplate{footline}{%
+    \hbox to \paperwidth{\hspace{0.6cm}{\color{brandMuted}\scriptsize\insertshorttitle}\hfill
+        {\color{brandMuted}\scriptsize\insertframenumber\,/\,\inserttotalframenumber}\hspace{0.6cm}}%
+    \vspace{0.25cm}}
+\setbeamertemplate{itemize item}{\color{brandTeal}\small\faChevronRight}
+\setbeamertemplate{itemize subitem}{\color{brandMuted}\small\faAngleRight}
+\setbeamertemplate{enumerate item}{\color{tealDeep}\bfseries\insertenumlabel.}
+% list lines are 1.4 cm apart (baseline to baseline)
+\newlength{\lineGap}\setlength{\lineGap}{1.4cm}
+\let\origlist\list
+\def\list#1#2{\origlist{#1}{#2\setlength{\itemsep}{\dimexpr\lineGap-\baselineskip\relax}\setlength{\parsep}{0pt}}}
+
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+\newcommand{\ras}[1]{\cellcolor{brandTeal!20}\textbf{#1}}
+\newcommand{\cell}[2]{\leavevmode\textcolor{#1}{#2}}
+\renewcommand{\arraystretch}{1.3}
+\setlength{\arrayrulewidth}{0.6pt}
+\arrayrulecolor{brandMuted!70}
+
+\tcbset{brandbox/.style={enhanced, arc=4pt, outer arc=4pt, boxrule=1.5pt,
+    coltitle=white, coltext=brandDark, fonttitle=\bfseries,
+    toptitle=0.8mm, bottomtitle=0.8mm, top=1.2mm, bottom=1.2mm, left=3mm, right=3mm,
+    before skip=4pt, after skip=4pt}}
+\newtcolorbox{tbox}[2][]{brandbox, colback=brandTeal!10, colframe=brandTeal, title={#2}, #1}
+\newtcolorbox{obox}[2][]{brandbox, colback=brandOrange!10, colframe=brandOrange, title={#2}, #1}
+\newtcolorbox{gbox}[2][]{brandbox, colback=brandGreen!8, colframe=brandGreen, title={#2}, #1}
+\newtcolorbox{pbox}[2][]{brandbox, colback=brandPurple!10, colframe=brandPurple, title={#2}, #1}
+
+\newcommand{\code}[1]{\mbox{\codefont\color{tealDeep}#1}}
+\newcommand{\hex}[1]{\mbox{#1\textsubscript{H}}}
+\newcommand{\bin}[1]{\mbox{#1\textsubscript{2}}}
+\newcommand{\nql}[2]{\mbox{#1\,$\leftarrow$\,#2}}
+
+% ---- code from ../../code/ (the verified programs of the course) ----
+\lstdefinelanguage{asm86}{
+    morekeywords={mov, add, adc, sub, sbb, inc, dec, neg, mul, imul, div, idiv,
+        cmp, and, or, xor, not, test, shl, shr, sal, sar, rol, ror, jmp, je, jne,
+        jz, jnz, jg, jge, jl, jle, ja, jae, jb, jbe, jcxz, loop, call, ret, iret,
+        int, push, pop, lea, xchg, in, out, nop, movsb, rep, cld, std, cli, sti,
+        syscall, addps, vaddps},
+    morekeywords=[2]{org, db, dw, dd, dq, equ, proc, endp, offset, ptr, byte,
+        word, dword, qword, section, global, dup, resb, rel},
+    sensitive=false, morecomment=[l]{;}, morestring=[b]', morestring=[b]"}
+\lstdefinestyle{base}{basicstyle=\codefont\fontsize{8}{8.6}\selectfont, columns=fullflexible,
+    keepspaces=true, showstringspaces=false, upquote=true,
+    keywordstyle=\color{tealDeep}\bfseries, keywordstyle=[2]\color{brandPurple!60!black}\bfseries,
+    commentstyle=\color{red!75!black}, stringstyle=\color{orangeDeep},
+    numbers=left, numberstyle=\tiny\color{brandMuted}, numbersep=7pt,
+    firstnumber=auto,  % excerpts keep the real line numbers of the book
+    xleftmargin=16pt, aboveskip=0pt, belowskip=0pt}
+\lstdefinestyle{asm}{style=base, language=asm86}
+\lstdefinestyle{c}{style=base, language=C}
+\newtcolorbox{codebox}{enhanced, colback=codeGrey, colframe=codeGrey, boxrule=0pt, arc=2pt,
+    left=3pt, right=3pt, top=2pt, bottom=2pt, before skip=3pt, after skip=3pt,
+    overlay={\fill[brandTeal!70] (frame.south west) rectangle ([xshift=2.5pt]frame.north west);}}
+\newtcolorbox{outbox}{enhanced, colback=brandDark, colframe=brandDark, boxrule=0pt, arc=2pt,
+    left=5pt, right=5pt, top=2pt, bottom=2pt, before skip=3pt, after skip=3pt, colupper=white}
+% \asm[firstline=5, lastline=20]{ch3/procnum.asm}   \cfile{...}   \screen{ch3/hello.out}
+% assembly on slides: copies in code/ with inline comments removed (same lines,
+% same numbers as the book; the explanation is on the slide)
+\newcommand{\asm}[2][]{\begin{codebox}\lstinputlisting[style=asm,#1]{code/#2}\end{codebox}}
+% smaller code for programs with long comments
+\newcommand{\codesize}{\codefont\fontsize{7}{7.5}\selectfont}
+\newcommand{\asms}[2][]{\begin{codebox}\lstinputlisting[style=asm,basicstyle=\codesize,#1]{code/#2}\end{codebox}}
+\newcommand{\cfiles}[2][]{\begin{codebox}\lstinputlisting[style=c,basicstyle=\codesize,#1]{../../code/#2}\end{codebox}}
+\newcommand{\cfile}[2][]{\begin{codebox}\lstinputlisting[style=c,#1]{../../code/#2}\end{codebox}}
+\newcommand{\screen}[2][]{\begin{outbox}\lstinputlisting[basicstyle=\codefont\fontsize{8}{8.6}\selectfont\color{white},
+    columns=fullflexible, keepspaces=true, aboveskip=0pt, belowskip=0pt,#1]{../../code/#2}\end{outbox}}
+
+\tikzset{
+    sahm/.style={-{Stealth[length=2.4mm]}, thick, color=brandMuted},
+    sahmT/.style={-{Stealth[length=2.4mm]}, very thick, color=tealDeep},
+    sahmO/.style={-{Stealth[length=2.4mm]}, very thick, color=orangeDeep},
+    unit/.style={draw=#1, fill=#1!15, very thick, rounded corners=4pt,
+        align=center, font=\bfseries\small, inner sep=4pt, text=brandDark},
+    unit/.default=brandTeal,
+    reg/.style={draw=brandDark, fill=white, thick, minimum height=0.6cm,
+        font=\codefont\small, inner sep=2pt},
+    % styles with a colour argument must be defined here, not inside a frame
+    layer/.style={draw=#1, fill=#1!15, very thick, minimum width=9cm, minimum height=0.7cm, font=\small},
+    evo/.style={unit=#1, minimum width=2.6cm, minimum height=1.2cm, font=\small},
+}
+
+% Title slide: \cover{Chapter 1}{Title}{subtitle}
+\newcommand{\cover}[3]{%
+\begin{frame}[plain]
+    \begin{tikzpicture}[remember picture, overlay]
+        \draw[brandTeal, line width=1.5pt, opacity=0.3] (current page.south east) ++(-1,1) circle (4cm);
+        \draw[brandTeal, line width=0.8pt, opacity=0.25] (current page.north west) ++(2,2) circle (6cm);
+        \draw[brandOrange, line width=0.5pt, opacity=0.25] (current page.north west) ++(2,2) circle (7cm);
+        \begin{scope}[shift={([xshift=-1.6cm, yshift=-1.4cm]current page.north east)}, scale=0.35]
+            \fill[brandDark] (-1.5,-1.5) rectangle (1.5,1.5);
+            \fill[brandTeal] (-1,-1) rectangle (1,1);
+            \foreach \i in {-1.2,-0.6,0,0.6,1.2} {
+                \draw[brandMuted, line width=1pt] (\i,1.5) -- (\i,2); \draw[brandMuted, line width=1pt] (\i,-1.5) -- (\i,-2);
+                \draw[brandMuted, line width=1pt] (1.5,\i) -- (2,\i); \draw[brandMuted, line width=1pt] (-1.5,\i) -- (-2,\i);}
+        \end{scope}
+    \end{tikzpicture}
+    \vspace{1.4cm}
+    \begin{minipage}{0.85\textwidth}
+        {\color{tealDeep}\bfseries Computer Architecture \textbullet\ #1}\\[0.3cm]
+        {\color{brandDark}\LARGE\bfseries #2\par}\vspace{0.3cm}
+        {\color{brandMuted}\large #3}
+    \end{minipage}
+    \vspace{1.2cm}
+    \begin{minipage}{0.85\textwidth}
+        \color{brandMuted}\small
+        \begin{tabular}{@{}ll}
+            \textbf{Teacher:} & Dr. Benabderrezak Youcef \\
+            \textbf{Course:} & UEF31, Architecture des ordinateurs \\
+        \end{tabular}
+    \end{minipage}
+\end{frame}}

@@ -1,0 +1,1168 @@
+\chapter{Case Study: the Intel 8086 Processor}
+
+\begin{khulasa}[: what will we learn in this chapter?]
+\begin{itemize}
+    \item The 80x86 family, and the internal structure of the 8086.
+    \item The 8086 registers, and segmented addressing (how to compute a physical address).
+    \item Writing a first program, and how an instruction runs inside the processor.
+    \item The instructions: transfer, arithmetic, logic, jumps, loops, then how an instruction becomes machine code.
+    \item Input/output, the stack, procedures, and interrupts.
+\end{itemize}
+\end{khulasa}
+
+%================================================
+\section{The 80x86 family}
+%================================================
+
+In 1978 Intel released the 8086. It was a big success because IBM chose its brother, the 8088, for the first
+personal computer (IBM PC) in 1981. Since then, every new Intel and AMD processor can still run 8086 programs.
+This family is called \textbf{x86}.
+
+\begin{tarif}
+    \term{Backward compatibility}{compatibilité ascendante}: a new processor understands all the instructions
+    of the older processors of its family. A program written for the 8086 in 1980 can run on a modern Core i7.
+    This is why the x86 family has lived for more than 45 years.
+\end{tarif}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|l|}
+    \hline
+    \ras{Processor} & \ras{Year} & \ras{Bits} & \ras{Max memory} & \ras{What is new} \\ \hline
+    8086 / 8088 & 1978 & 16 & 1 MB & first processor of the family \\ \hline
+    80286 & 1982 & 16 & 16 MB & protected mode \\ \hline
+    80386 & 1985 & 32 & 4 GB & first 32-bit processor (IA-32) \\ \hline
+    80486 & 1989 & 32 & 4 GB & cache memory and floating-point unit inside \\ \hline
+    Pentium & 1993 & 32 & 4 GB & runs two instructions at once \\ \hline
+    Athlon 64 (AMD) & 2003 & 64 & $2^{48}$ in practice & the AMD64 (x86-64) architecture \\ \hline
+    Core i7 and later & 2008 & 64 & huge & several cores on the same chip \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{tarif}
+    \textbf{General features of the 8086}:
+    \begin{itemize}
+        \item a \textbf{16-bit} processor: its registers and its data bus are 16 bits wide.
+        \item a \textbf{20-bit} address bus: it can address 1 MB of memory.
+        \item about 29\,000 transistors, and a frequency between 5 and 10 MHz.
+        \item about \textbf{100 different instructions} (a CISC processor).
+    \end{itemize}
+\end{tarif}
+
+\begin{hal}
+    The only difference between the 8086 and the 8088 is the \textbf{external data bus}: 16 bits in the 8086,
+    only 8 bits in the 8088. Inside, they are identical. IBM chose the 8088 because 8-bit support chips were
+    cheaper at that time.
+\end{hal}
+
+%================================================
+\section{Inside the 8086}
+%================================================
+
+The 8086 is split into two units that work \textbf{at the same time}:
+
+\begin{center}
+\begin{tikzpicture}[r/.style={reg, minimum width=1.25cm, font=\codefont\small}]
+    \draw[brandTeal, very thick, rounded corners=6pt, fill=brandTeal!8] (0.3,-3.2) rectangle (6.6,2.6);
+    \node[font=\bfseries, text=tealDeep] at (3.45,2.25) {Execution Unit (EU)};
+    \foreach \n/\y in {AX/1.4, BX/0.8, CX/0.2, DX/-0.4} \node[r] at (1.3,\y) {\n};
+    \foreach \n/\y in {SI/1.4, DI/0.8, BP/0.2, SP/-0.4} \node[r] at (2.7,\y) {\n};
+    \draw[brandGreen!70!black, very thick, fill=brandGreen!20] (4.1,1.2) -- (5.9,1.2) -- (5.5,-0.2) -- (4.5,-0.2) -- cycle;
+    \node[font=\bfseries\small] at (5,0.5) {UAL};
+    \node[r, minimum width=2.5cm, font=\small] at (5,-1.0) {FLAGS};
+    \node[unit=brandOrange, font=\small, minimum width=2.6cm] at (2.2,-2.1) {control unit};
+    \draw[brandOrange, very thick, rounded corners=6pt, fill=brandOrange!8] (-6.3,-3.2) rectangle (-0.3,2.6);
+    \node[font=\bfseries, text=orangeDeep] at (-3.3,2.25) {Bus Interface Unit (BIU)};
+    \node[r] at (-4.6,1.4) {CS}; \node[r] at (-4.6,0.8) {DS};
+    \node[r] at (-4.6,0.2) {SS}; \node[r] at (-4.6,-0.4) {ES};
+    \node[r] at (-4.6,-1.0) {IP};
+    \node[draw=brandDark, fill=brandOrange!25, thick, minimum width=1.4cm, minimum height=0.6cm, font=\small] at (-2,1.1) {adder $\Sigma$};
+    \node[font=\scriptsize, align=center] at (-2,0.35) {computes the\\physical address};
+    \foreach \i in {0,...,5} \node[draw=brandDark, fill=white, minimum width=0.55cm, minimum height=0.5cm] at (-4.2+0.6*\i,-2.1) {};
+    \node[font=\scriptsize] at (-2.7,-2.75) {instruction queue (6 bytes)};
+    \draw[sahmT, <->] (-0.3,-2.1) -- (0.3,-2.1);
+    \draw[brandDark, line width=4pt, {Stealth[length=4mm]}-{Stealth[length=4mm]}] (-6.3,0.2) -- (-7.8,0.2);
+    \node[font=\small, align=center] at (-7.1,-0.5) {system\\bus};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+    \item The \term{Bus Interface Unit}{unité d'interface de bus} (BIU): it talks with memory. It computes the
+          addresses, fetches instructions in advance into a \textbf{queue} of 6 bytes, and reads and writes data.
+    \item The \term{Execution Unit}{unité d'exécution} (EU): it takes the instructions from the queue, decodes
+          them, and runs them with the arithmetic and logic unit.
+\end{itemize}
+
+\begin{tashbih}
+    In a restaurant, the \textbf{waiter} (BIU) brings orders from the customers and puts them in a queue in front of
+    the cook, while the \textbf{cook} (EU) prepares the current order. The cook never waits for the waiter, because
+    the next order is always in the queue. This is the first idea of a pipeline!
+\end{tashbih}
+
+%================================================
+\section{The 8086 registers}
+%================================================
+
+The 8086 has \textbf{14 registers} of 16 bits.
+
+\subsection{General registers}
+Four data registers. Each one can be split into two halves of 8 bits:
+
+\begin{center}
+\begin{tikzpicture}[h/.style={draw=brandDark, thick, minimum width=2.2cm, minimum height=0.7cm, font=\codefont\bfseries}]
+    \foreach \r/\n/\d [count=\i from 0] in {A/AX/{accumulator: arithmetic, multiply, divide, input/output},
+                                         B/BX/{base: keeps an address in memory},
+                                         C/CX/{counter: number of loop turns},
+                                         D/DX/{data: with AX for multiply and divide}} {
+        \node[font=\codefont\bfseries, text=tealDeep] at (-1.6,-0.9*\i) {\n};
+        \node[h, fill=brandTeal!25] (hi\i) at (0,-0.9*\i) {\r H};
+        \node[h, fill=brandTeal!10] (lo\i) at (2.2,-0.9*\i) {\r L};
+        \node[font=\small, anchor=west] at (3.6,-0.9*\i) {\d};
+    }
+    \node[font=\scriptsize] at (0,0.6) {bits 15 to 8};
+    \node[font=\scriptsize] at (2.2,0.6) {bits 7 to 0};
+\end{tikzpicture}
+\end{center}
+
+\begin{mithal}
+    If AX = \hex{1234} then AH = \hex{12} and AL = \hex{34}. If we change AL to \hex{FF}, AX becomes \hex{12FF}.
+\end{mithal}
+
+Why split the registers? Because we often work with small values (a character, a number from 0 to 255).
+Instead of wasting a whole 16-bit register for one character, we can put two characters in one register:
+one in AH and one in AL.
+
+\begin{intabih}
+    These registers are ``general'' because we can use them in any calculation, but some instructions force a
+    register: \code{loop} always uses CX, \code{mul} and \code{div} always use AX and DX, and the
+    \code{int 21h} services expect the function number in AH. You must remember these roles.
+\end{intabih}
+
+\subsection{Pointer and index registers}
+\begin{center}
+\begin{tabular}{|c|l|l|}
+    \hline
+    \ras{Register} & \ras{Name} & \ras{Job} \\ \hline
+    SI & Source Index & index of the source (arrays and strings) \\ \hline
+    DI & Destination Index & index of the destination \\ \hline
+    SP & Stack Pointer & points to the top of the stack \\ \hline
+    BP & Base Pointer & to reach data inside the stack \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{mithal}
+    To walk through an array of 10 elements, we put its start address in SI, then increase SI at each turn
+    (\code{inc si}). At the first turn SI points to the first element, at the second turn to the second one,
+    and so on. SI plays the role of the \textbf{finger} you put on the element you are reading now.
+\end{mithal}
+
+\subsection{Segment registers}
+\begin{center}
+\begin{tabular}{|c|l|l|}
+    \hline
+    \ras{Register} & \ras{Name} & \ras{Points to the start of\dots} \\ \hline
+    CS & Code Segment & the program segment (the instructions) \\ \hline
+    DS & Data Segment & the data segment (the variables) \\ \hline
+    SS & Stack Segment & the stack segment \\ \hline
+    ES & Extra Segment & an extra segment (for copying strings, for example) \\ \hline
+\end{tabular}
+\end{center}
+
+\subsection{Instruction pointer and flags}
+\begin{itemize}
+    \item \textbf{IP} (Instruction Pointer): the address of the next instruction inside the code segment. It is the
+          CO we saw in Chapter 2. We cannot change it directly with \code{mov}, only with jumps and calls.
+    \item \textbf{FLAGS}: 9 bits are used out of 16:
+\end{itemize}
+
+\begin{center}
+\begin{tikzpicture}[b/.style={draw=brandDark, minimum width=0.75cm, minimum height=0.7cm, font=\codefont\scriptsize\bfseries}]
+    \foreach \n [count=\i from 0] in {{}, {}, {}, {}, OF, DF, IF, TF, SF, ZF, {}, AF, {}, PF, {}, CF} {
+        \pgfmathtruncatemacro\bit{15-\i}
+        \node[b, fill=brandTeal!15] at (0.75*\i, 0) {\n};
+        \node[font=\codefont\tiny] at (0.75*\i, 0.55) {\bit};
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|c|R||c|R|}
+    \hline
+    \ras{Flag} & \ras{Meaning} & \ras{Flag} & \ras{Meaning} \\ \hline
+    CF & carry or borrow out of the last bit & OF & overflow: wrong result for signed numbers \\ \hline
+    PF & the number of 1s in the low byte is even & DF & direction for strings (0: forward) \\ \hline
+    AF & carry from bit 3 to bit 4 & IF & hardware interrupts allowed \\ \hline
+    ZF & the result is zero & TF & step-by-step execution (for debugging) \\ \hline
+    SF & the result is negative (last bit is 1) & & \\ \hline
+\end{tabularx}
+\end{center}
+
+%================================================
+\section{Segmented addressing}
+%================================================
+
+\subsection{The problem}
+The 8086 registers are 16 bits wide, so they can write addresses from 0 to $2^{16} - 1 = 65535$ only
+(that is 64 KB). But the address bus is 20 bits wide (1 MB). How can we write a 20-bit address with 16-bit registers?
+
+\subsection{The solution: segment and offset}
+We use \textbf{two registers}: a \textbf{segment} register gives the start of a zone of memory, and the
+\textbf{offset} gives the distance inside this zone. We write the logical address as \texttt{segment:offset}.
+
+\begin{tarif}
+    \centering
+    $\text{physical address} = \text{segment} \times 16 + \text{offset}$
+    \par\small
+    Multiplying by 16 = adding one zero on the right in hexadecimal.
+\end{tarif}
+
+\begin{khatwa}[: the physical address for CS = 1000H and IP = 0234H]
+    \begin{enumerate}
+        \item Multiply the segment by 16 (add a zero): \hex{1000} becomes \hex{10000}.
+        \item Add the offset:
+        \begin{center}
+        {\codefont
+        \begin{tabular}{r}
+              10000 \\
+            + \ 0234 \\ \hline
+              10234
+        \end{tabular}}
+        \end{center}
+        \item The physical address is \hex{10234}, a 20-bit address (5 hex digits).
+    \end{enumerate}
+\end{khatwa}
+
+\begin{center}
+\begin{tikzpicture}
+    \draw[thick, fill=brandLight] (0,0) rectangle (2.5,-7);
+    \node[font=\small\bfseries] at (1.25,0.35) {memory (1 MB)};
+    \node[font=\codefont\scriptsize, anchor=east] at (-0.1,-0.1) {00000};
+    \node[font=\codefont\scriptsize, anchor=east] at (-0.1,-6.9) {FFFFF};
+    \fill[brandTeal!30] (0,-2) rectangle (2.5,-4.5);
+    \draw[thick] (0,-2) rectangle (2.5,-4.5);
+    \node[font=\scriptsize, align=center] at (1.25,-3.4) {segment\\(64 KB)};
+    \draw[sahmO] (4,-2) node[right, font=\small] {segment start: 10000} -- (2.5,-2);
+    \draw[sahmT] (4,-2.8) node[right, font=\small] {address 10234} -- (2.5,-2.8);
+    \draw[decorate, decoration={brace, amplitude=5pt, mirror}, thick] (-0.1,-2) -- (-0.1,-2.8)
+        node[midway, left=6pt, font=\small] {offset 0234};
+\end{tikzpicture}
+\end{center}
+
+\subsection{Why multiply by 16?}
+If we used the segment as it is (without multiplying), we could not go beyond $\hex{FFFF} + \hex{FFFF} = \hex{1FFFE}$,
+about 128 KB only. With the multiplication by 16, a segment can point anywhere in 1 MB: $\hex{FFFF} \times 16 = \hex{FFFF0}$.
+So each segment always starts at an address that can be divided by 16. This block of 16 bytes is called a
+\term{paragraph}{paragraphe}.
+
+\begin{khatwa}[: which zone does the segment DS = 2000H cover?]
+    \begin{enumerate}
+        \item The smallest offset is \hex{0000}: $\hex{20000} + \hex{0000} = \hex{20000}$.
+        \item The biggest offset is \hex{FFFF}: $\hex{20000} + \hex{FFFF} = \hex{2FFFF}$.
+        \item The segment covers the zone from \hex{20000} to \hex{2FFFF}, that is $2^{16} = 65536$ bytes = 64 KB.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{tashbih}
+    Imagine a town with many streets. The full address of a house is ``\textbf{street} number 12, \textbf{house}
+    number 34''. The segment register is the street number (it gives the start of a zone), and the offset is the
+    house number inside the street. The postman needs both pieces of information to find the house.
+\end{tashbih}
+
+\begin{intabih}
+    One physical address can be written in several ways: 1000:0234 and 1023:0004 give the same address
+    \hex{10234}. Check it yourself: $\hex{10230} + \hex{0004} = \hex{10234}$.
+\end{intabih}
+
+\subsection{Default pairs}
+Each offset register is used by default with a given segment register:
+
+\begin{center}
+\begin{tabular}{|c|c|l|}
+    \hline
+    \ras{Offset} & \ras{Default segment} & \ras{Use} \\ \hline
+    IP & CS & fetching instructions \\ \hline
+    SP, BP & SS & the stack \\ \hline
+    BX, SI, direct address & DS & variables \\ \hline
+    DI (in string instructions) & ES & destination of a copy \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{hal}
+    In the .COM programs we write in this chapter, the four segments CS = DS = SS = ES are equal: the whole
+    program fits in one 64 KB segment, and starts at offset \hex{100}. This is the meaning of the line
+    \code{org 100h} that we find in all our programs.
+\end{hal}
+
+%================================================
+\section{8086 addressing modes}
+%================================================
+
+\begin{tarif}
+    The \term{effective address}{adresse effective} (EA): the offset the processor computes for a memory operand.
+    Then it computes the physical address $= \text{DS} \times 16 + \text{EA}$.
+\end{tarif}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{2.8cm}|>{\centering\arraybackslash}p{3.4cm}|R|}
+    \hline
+    \ras{Mode} & \ras{Example} & \ras{Effective address EA} \\ \hline
+    immediate & \code{mov ax, 5} & none: the value is in the instruction \\ \hline
+    register & \code{mov ax, bx} & none: the value is in a register \\ \hline
+    direct & \code{mov ax, [0200h]} & EA = \hex{0200} \\ \hline
+    register indirect & \code{mov ax, [bx]} & EA = BX (or SI, DI, BP) \\ \hline
+    based & \code{mov ax, [bx+4]} & EA = BX + 4 \\ \hline
+    indexed & \code{mov ax, [si+4]} & EA = SI + 4 \\ \hline
+    based indexed & \code{mov ax, [bx+si+4]} & EA = BX + SI + 4 \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{khatwa}[: where does \code{mov ax, [bx+si+4]} read?]
+    We suppose: DS = \hex{2000}, BX = \hex{0100}, SI = \hex{0020}.
+    \begin{enumerate}
+        \item Effective address: $\text{EA} = \hex{0100} + \hex{0020} + 4 = \hex{0124}$.
+        \item Physical address: $\hex{2000} \times 16 + \hex{0124} = \hex{20000} + \hex{0124} = \hex{20124}$.
+        \item The processor reads a word (two bytes): the byte at \hex{20124} goes into AL, and the byte at
+              \hex{20125} goes into AH.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{khatwa}[: \code{mov ax, [bp+2]} uses the segment SS]
+    We suppose SS = \hex{3000} and BP = \hex{FFF0}.
+    \begin{enumerate}
+        \item Effective address: $\text{EA} = \hex{FFF0} + 2 = \hex{FFF2}$.
+        \item Because we used BP, the default segment is SS, not DS.
+        \item Physical address: $\hex{30000} + \hex{FFF2} = \hex{3FFF2}$.
+    \end{enumerate}
+    This is important in procedures: BP is used to read the parameters that are in the stack.
+\end{khatwa}
+
+\begin{intabih}
+    The 8086 stores a word in memory with the \textbf{small byte first} (little endian): the word \hex{1234}
+    is stored as 34 then 12. Also, two memory operands in the same instruction are not allowed: \code{mov [a], [b]} is wrong.
+\end{intabih}
+
+%================================================
+\section{A first program}
+%================================================
+
+\subsection{The tools}
+We write the program in \textbf{EMU8086}: \emph{File $\rightarrow$ New $\rightarrow$ COM template}, then we press
+\emph{Emulate} and run one instruction at a time with the \emph{Single step} button.
+
+Every assembly program goes through three steps:
+\begin{center}
+\begin{tikzpicture}[node distance=1.9cm]
+    \node[unit=brandTeal, minimum width=2.8cm] (src) {source file\\\code{hello.asm}};
+    \node[unit=brandOrange, minimum width=2.8cm, right=of src] (bin) {executable file\\\code{hello.com}};
+    \node[unit=brandGreen, minimum width=2.8cm, right=of bin] (run) {running\\in memory};
+    \draw[sahmT] (src) -- node[above, font=\scriptsize, text=brandDark] {assembler} (bin);
+    \draw[sahmT] (bin) -- node[above, font=\scriptsize, text=brandDark] {loading} (run);
+\end{tikzpicture}
+\end{center}
+\begin{enumerate}
+    \item \textbf{Writing}: we type the instructions in a text file (the source).
+    \item \textbf{Assembling}: the assembler turns each instruction into machine-code bytes, and computes the
+          addresses of the variables and labels.
+    \item \textbf{Loading and running}: the system copies the bytes into memory starting at offset \hex{100},
+          sets IP = \hex{100}, and the processor starts.
+\end{enumerate}
+
+\subsection{The program}
+\asm{ch3/hello.asm}
+\screen{ch3/hello.out}
+
+\begin{sharh}
+    \s{1}{A comment: everything after \code{;} is not run by the processor; it is an explanation for the reader.}
+    \s{2}{\code{org 100h}: a .COM program starts at offset \hex{100}.}
+    \s{4}{Put the address of the message \code{msg} into DX.}
+    \s{5}{Choose DOS function \hex{09}: ``print the string whose address is in DX''.}
+    \s{6}{\code{int 21h}: ask DOS to run the function chosen in AH.}
+    \s{7}{\code{ret}: end of the program, back to the system.}
+    \s{9}{Define the variable \code{msg} with \code{db} (define byte). The sign \code{\$} marks the end of the text.}
+\end{sharh}
+
+\begin{intabih}
+    We put the data \textbf{after} \code{ret}. If we put it before the instructions, the processor would try
+    to run the letters of the message as if they were instructions!
+\end{intabih}
+
+\begin{khatwa}[: the program in memory after loading]
+    These are the real bytes made by the assembler:
+    \begin{center}
+    \small
+    \begin{tabular}{|c|l|l|}
+        \hline \ras{Offset} & \ras{Bytes} & \ras{Content} \\ \hline
+        0100 & {\codefont 8D 16 09 01} & \code{lea dx, msg} (address \hex{0109}) \\ \hline
+        0104 & {\codefont B4 09} & \code{mov ah, 09h} \\ \hline
+        0106 & {\codefont CD 21} & \code{int 21h} \\ \hline
+        0108 & {\codefont C3} & \code{ret} \\ \hline
+        0109 & {\codefont 53 61 6C 61 6D \dots} & the letters \code{S a l a m \dots} \\ \hline
+    \end{tabular}
+    \end{center}
+    The whole program is 9 bytes of instructions, and the message starts right after, at \hex{0109}. Notice
+    that the assembler computed the address of \code{msg} by itself and put it inside the \code{lea} instruction.
+\end{khatwa}
+
+\subsection{Defining variables}
+\begin{center}
+\begin{tabular}{|l|l|}
+    \hline
+    \ras{Writing} & \ras{Meaning} \\ \hline
+    \code{x db 5} & one byte with value 5 \\ \hline
+    \code{y dw 1234h} & one word (two bytes) with value \hex{1234} \\ \hline
+    \code{t db 14, 3, 27} & an array of 3 bytes \\ \hline
+    \code{buf db 10 dup(0)} & 10 bytes, all 0 \\ \hline
+    \code{s db 'Hi\$'} & a string of characters \\ \hline
+\end{tabular}
+\end{center}
+
+%================================================
+\section{How an instruction runs inside the 8086}
+%================================================
+
+Let us follow the instruction \code{mov cx, [si]} from the program \code{transfer.asm} (next section). In
+memory, this instruction is written with the bytes 8B 0C at offset \hex{010C}, and SI = \hex{0112}.
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{1.3cm}|>{\centering\arraybackslash}p{1.2cm}|R|}
+    \hline
+    \ras{Step} & \ras{Unit} & \ras{What happens} \\ \hline
+    1 & BIU & computes the physical address $\text{CS} \times 16 + \text{IP}$, and fetches the bytes 8B 0C into the queue (often before we need them). \\ \hline
+    2 & EU & takes 8B from the queue: ``move a word from memory to a register''. Then 0C: ``register CX, address in SI''. IP becomes \hex{010E}. \\ \hline
+    3 & EU & computes the effective address: EA = SI = \hex{0112}. \\ \hline
+    4 & BIU & computes $\text{DS} \times 16 + \hex{0112}$, sends it on the address bus, with a read signal. \\ \hline
+    5 & BIU & the word \hex{ABCD} arrives on the data bus (CD then AB). \\ \hline
+    6 & EU & writes the result into CX: CX = \hex{ABCD}. The flags do not change with \code{mov}. \\ \hline
+\end{tabularx}
+\end{center}
+
+%================================================
+\section{The instruction set in detail}
+%================================================
+
+We use these short names in the tables: reg = register, mem = memory box, imm = immediate value.
+
+\subsection{Transfer instructions}
+\begin{center}
+\small
+\begin{tabular}{|l|l|l|}
+    \hline
+    \ras{Instruction} & \ras{Meaning} & \ras{Example} \\ \hline
+    \code{mov dest, src} & $\text{dest} \leftarrow \text{src}$ & \code{mov ax, bx} \\ \hline
+    \code{xchg a, b} & swap the two values & \code{xchg ax, bx} \\ \hline
+    \code{lea reg, mem} & reg gets the address of the variable & \code{lea si, tab} \\ \hline
+    \code{push src} & put on the stack & \code{push ax} \\ \hline
+    \code{pop dest} & take from the stack & \code{pop ax} \\ \hline
+\end{tabular}
+\end{center}
+
+\asm{ch3/transfer.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|c|c|}
+    \hline
+    \ras{Line} & \ras{Instruction} & \ras{AX} & \ras{BX} & \ras{CX} & \ras{SI} \\ \hline
+    4 & \code{mov ax, 1234h} & \cell{orangeDeep}{1234} & 0000 & 0000 & 0000 \\ \hline
+    5 & \code{mov bl, ah} & 1234 & \cell{orangeDeep}{0012} & 0000 & 0000 \\ \hline
+    6 & \code{mov bh, al} & 1234 & \cell{orangeDeep}{3412} & 0000 & 0000 \\ \hline
+    7 & \code{xchg ax, bx} & \cell{orangeDeep}{3412} & \cell{orangeDeep}{1234} & 0000 & 0000 \\ \hline
+    8 & \code{lea si, num} & 3412 & 1234 & 0000 & \cell{orangeDeep}{0112} \\ \hline
+    9 & \code{mov cx, [si]} & 3412 & 1234 & \cell{orangeDeep}{ABCD} & 0112 \\ \hline
+    10 & \code{mov [res], ax} & 3412 & 1234 & ABCD & 0112 \\ \hline
+\end{tabular}
+\end{center}
+\begin{sharh}
+    \s{5--6}{Copy the two halves of AX into BX, swapped: BH = 34 and BL = 12.}
+    \s{8}{\code{lea} gives the \textbf{address} \hex{0112}, not the value.}
+    \s{9}{Read the word stored at address \hex{0112}: \hex{ABCD}.}
+    \s{10}{The only line that writes into memory: \code{res} becomes \hex{3412}.}
+\end{sharh}
+
+\subsection{Arithmetic instructions}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|l|R|l|}
+    \hline
+    \ras{Instruction} & \ras{Meaning} & \ras{Flags} \\ \hline
+    \code{add d, s} & $d \leftarrow d + s$ & all \\ \hline
+    \code{adc d, s} & $d \leftarrow d + s + \text{CF}$ (to add big numbers) & all \\ \hline
+    \code{sub d, s} & $d \leftarrow d - s$ & all \\ \hline
+    \code{inc d} & $d \leftarrow d + 1$ & all except CF \\ \hline
+    \code{dec d} & $d \leftarrow d - 1$ & all except CF \\ \hline
+    \code{neg d} & $d \leftarrow -d$ (two's complement) & all \\ \hline
+    \code{cmp a, b} & computes $a - b$ \textbf{without keeping the result} & all \\ \hline
+    \code{mul s} & unsigned multiply (\code{imul} for signed) & CF, OF \\ \hline
+    \code{div s} & unsigned divide (\code{idiv} for signed) & undefined \\ \hline
+\end{tabularx}
+\end{center}
+
+\asm{ch3/arith.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|c|}
+    \hline
+    \ras{Line} & \ras{Instruction} & \ras{Result} & \ras{Decimal} & \ras{CF} \\ \hline
+    4 & \code{mov al, 25} & AL = 19 & 25 & 0 \\ \hline
+    5 & \code{add al, 17} & AL = 2A & 42 & 0 \\ \hline
+    6 & \code{sub al, 2} & AL = 28 & 40 & 0 \\ \hline
+    7 & \code{inc al} & AL = 29 & 41 & 0 \\ \hline
+    8 & \code{dec al} & AL = 28 & 40 & 0 \\ \hline
+    9 & \code{neg al} & AL = D8 & $-40$ & 1 \\ \hline
+    10 & \code{mov bx, 1000} & BX = 03E8 & 1000 & 1 \\ \hline
+    11 & \code{add bx, 2500} & BX = 0DAC & 3500 & 0 \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: why is $-40$ written \hex{D8}? (two's complement)]
+    \begin{enumerate}
+        \item Write 40 in binary: \bin{0010\,1000}.
+        \item Flip all the bits: \bin{1101\,0111}.
+        \item Add 1: $\bin{1101\,1000} = \hex{D8}$.
+    \end{enumerate}
+    Check: $40 + (-40) = \hex{28} + \hex{D8} = \hex{100}$, and on 8 bits only 00 is left. Correct!
+\end{khatwa}
+
+\subsubsection{Multiplication and division}
+The processor chooses the place depending on the size of the operand:
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|}
+    \hline
+    \ras{Instruction} & \ras{Operand} & \ras{Operation} & \ras{Result} \\ \hline
+    \code{mul bl} & 8 bits & $\text{AL} \times \text{BL}$ & AX \\ \hline
+    \code{mul cx} & 16 bits & $\text{AX} \times \text{CX}$ & DX:AX (32 bits) \\ \hline
+    \code{div bl} & 8 bits & $\text{AX} \div \text{BL}$ & AL = quotient, AH = remainder \\ \hline
+    \code{div cx} & 16 bits & $\text{DX:AX} \div \text{CX}$ & AX = quotient, DX = remainder \\ \hline
+\end{tabular}
+\end{center}
+
+\asm{ch3/muldiv.asm}
+
+\begin{sharh}
+    \s{6}{$12 \times 11 = 132 = \hex{84}$: AX = \hex{0084}.}
+    \s{10}{$300 \times 500 = 150000$, which is bigger than 65535, so it is split over two registers:
+           DX = \hex{0002} and AX = \hex{49F0} (because $\hex{249F0} = 150000$).}
+    \s{14}{$47 = 5 \times 9 + 2$: AL = 09 (quotient) and AH = 02 (remainder), so AX = \hex{0209}.}
+\end{sharh}
+
+\begin{intabih}
+    Before \code{div cx} we must put DX = 0 if the number to divide is only in AX; otherwise the processor takes DX
+    as part of the number. Dividing by 0 stops the program (interrupt number 0).
+\end{intabih}
+
+\subsubsection{Adding numbers bigger than 16 bits: \code{adc}}
+The 8086 adds 16 bits at a time. To add two 32-bit numbers, we split each number into two words (high and
+low). We add the low words with \code{add}, then the high words with \code{adc}, which adds the carry CF
+from the first addition, exactly like we carry ``one'' to the next column when we add with a pen.
+
+\asm{ch3/add32.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|c|}
+    \hline
+    \ras{Line} & \ras{Instruction} & \ras{DX} & \ras{AX} & \ras{CF} \\ \hline
+    5--6 & load the first number & 0001 & FFFF & 0 \\ \hline
+    7 & \code{add ax, 0001h} & 0001 & \cell{orangeDeep}{0000} & \cell{orangeDeep}{\textbf{1}} \\ \hline
+    8 & \code{adc dx, 0000h} & \cell{orangeDeep}{0002} & 0000 & 0 \\ \hline
+\end{tabular}
+\end{center}
+The result is DX:AX = 0002:0000 = \hex{00020000}. If we used \code{add} on line 8, the carry would be lost and
+we would get \hex{00010000}, a wrong result.
+
+\subsection{Logic instructions}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|l|R|l|}
+    \hline
+    \ras{Instruction} & \ras{Usual use} & \ras{Example} \\ \hline
+    \code{and} & switch bits off (a mask) & \code{and al, 0Fh} \\ \hline
+    \code{or} & switch bits on & \code{or al, 80h} \\ \hline
+    \code{xor} & flip bits, or clear a register & \code{xor cx, cx} \\ \hline
+    \code{not} & flip all the bits & \code{not al} \\ \hline
+    \code{test} & \code{and} without keeping the result (check a bit) & \code{test al, 1} \\ \hline
+    \code{shl}, \code{shr} & shift: multiply or divide by 2 & \code{shl bl, 1} \\ \hline
+    \code{rol}, \code{ror} & rotate: the bit that leaves comes back on the other side & \code{rol al, 1} \\ \hline
+\end{tabularx}
+\end{center}
+
+\asm{ch3/logic.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|}
+    \hline
+    \ras{Line} & \ras{Instruction} & \ras{AL in binary} & \ras{Hex} \\ \hline
+    4 & \code{mov al, 10110110b} & {\codefont 1011 0110} & B6 \\ \hline
+    5 & \code{and al, 00001111b} & {\codefont 0000 0110} & 06 \\ \hline
+    6 & \code{or  al, 10000000b} & {\codefont 1000 0110} & 86 \\ \hline
+    7 & \code{xor al, 11111111b} & {\codefont 0111 1001} & 79 \\ \hline
+    8 & \code{not al} & {\codefont 1000 0110} & 86 \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{sharh}
+    \s{5}{\code{and} with 1 keeps the bit, and with 0 switches it off: we keep only the 4 low bits.}
+    \s{6}{\code{or} with 1 switches the bit on: bit 7 is now 1.}
+    \s{10--12}{BL: $5 \rightarrow 10 \rightarrow 20 \rightarrow 10$. A shift left multiplies by 2, and a shift right divides by 2.}
+    \s{13}{\code{xor cx, cx}: every bit with itself gives 0, so CX = 0. Faster and shorter than \code{mov cx, 0}.}
+\end{sharh}
+
+\subsubsection{Practical uses of masks}
+\begin{khatwa}[: is the number in AL even?]
+    A number is even if bit 0 is 0. We write \code{test al, 1}: this instruction computes $\text{AL} \cdot 1$
+    without changing AL.
+    \begin{itemize}
+        \item If AL = 6 = \bin{0000\,0110}: bit 0 is 0, the result is 0, and ZF = 1: the number is even.
+        \item If AL = 7 = \bin{0000\,0111}: bit 0 is 1, the result is 1, and ZF = 0: the number is odd.
+    \end{itemize}
+    Then we write \code{jz even} to jump when the number is even.
+\end{khatwa}
+
+\begin{khatwa}[: turn a small letter into a capital letter with a mask]
+    In the ASCII table: \code{'a'} $= \hex{61} = \bin{0110\,0001}$ and \code{'A'} $= \hex{41} = \bin{0100\,0001}$.
+    The only difference is bit 5. So \code{and al, 11011111b} (that is \code{0DFh}) switches bit 5 off and turns
+    any small letter into a capital letter, and leaves a capital letter as it is. This is another way than
+    \code{sub al, 32}, which we see in the input section.
+\end{khatwa}
+
+\subsection{Flow control: jumps}
+Usually the processor runs the instructions in order. A \textbf{jump} changes IP, so execution goes somewhere else.
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|l|R|l|}
+    \hline
+    \ras{Instruction} & \ras{Jumps if\dots} & \ras{Flags} \\ \hline
+    \code{jmp L} & always (unconditional jump) & -- \\ \hline
+    \code{je}, \code{jz} & equal / result is zero & ZF = 1 \\ \hline
+    \code{jne}, \code{jnz} & not equal & ZF = 0 \\ \hline
+    \code{jg}, \code{jge} & greater / greater or equal (\textbf{signed}) & ZF, SF, OF \\ \hline
+    \code{jl}, \code{jle} & less / less or equal (\textbf{signed}) & SF, OF \\ \hline
+    \code{ja}, \code{jae} & above / above or equal (\textbf{unsigned}) & CF, ZF \\ \hline
+    \code{jb}, \code{jbe} & below / below or equal (\textbf{unsigned}) & CF, ZF \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{tashbih}
+    \code{cmp} is like \textbf{putting two things on a scale}, and a conditional jump is like saying: ``\textbf{if}
+    the right side goes down, go right''. The scale (\code{cmp}) sets the flags, and the jump looks at them.
+\end{tashbih}
+
+\subsubsection{Example: if \dots\ else}
+\asm{ch3/ifelse.asm}
+\screen{ch3/ifelse.out}
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.6cm]
+    \node[unit] (c) {\code{cmp al, [b]}};
+    \node[diamond, aspect=2.2, draw=brandOrange, fill=brandOrange!15, thick, below=of c, font=\small] (q) {$a > b$?};
+    \node[unit=brandGreen, below right=0.4cm and 0.6cm of q] (y) {\code{lea dx, msg1}};
+    \node[unit=brandPurple, below left=0.4cm and 0.6cm of q] (n) {\code{lea dx, msg2}};
+    \node[unit, below=1.8cm of q] (p) {\code{int 21h} (print)};
+    \draw[sahm] (c) -- (q);
+    \draw[sahm] (q) -| node[pos=0.2, above, font=\small] {yes: \code{jg first}} (y);
+    \draw[sahm] (q) -| node[pos=0.2, above, font=\small] {no} (n);
+    \draw[sahm] (y) |- (p);
+    \draw[sahm] (n) |- node[pos=0.7, below, font=\small] {\code{jmp show}} (p);
+\end{tikzpicture}
+\end{center}
+
+\begin{sharh}
+    \s{5}{\code{cmp} computes $7 - 12 = -5$ and does not keep it, but it sets the flags (SF = 1).}
+    \s{6}{\code{jg}: is $a > b$? No, so we do not jump and continue at line 7.}
+    \s{7--8}{Choose the second message, then \code{jmp show} is \textbf{needed} so that line 10 is not run.}
+    \s{12--13}{The printing is shared by the two cases.}
+\end{sharh}
+
+\begin{intabih}
+    We often forget \code{jmp show} on line 8! Without it, the program also runs \code{lea dx, msg1}, so it
+    always prints the first message.
+\end{intabih}
+
+\subsubsection{Signed or unsigned? \code{jg} or \code{ja}}
+The same bits can be read in two ways (we saw this in Chapter 2). AL = \hex{C8} is 200 unsigned, and $-56$
+signed. So the processor has two kinds of jumps: \code{ja}/\code{jb} for unsigned numbers, and \code{jg}/\code{jl}
+for signed numbers.
+
+\asm{ch3/signed.asm}
+\screen{ch3/signed.out}
+
+\begin{sharh}
+    \s{4--6}{\code{ja}: compare 200 with 100 as positive numbers. $200 > 100$, so we jump.}
+    \s{14--16}{\code{jg}: the same bits \hex{C8}, but read as signed: $-56 > 100$? No, so we do not jump.}
+\end{sharh}
+
+\begin{intabih}
+    Choose the jump from the \textbf{kind of data}: ages, addresses, character codes, sizes are unsigned
+    (\code{ja}, \code{jb}). Temperatures, balances, differences are signed (\code{jg}, \code{jl}).
+\end{intabih}
+
+\subsubsection{From the algorithm to assembly}
+Each control structure from the algorithms course has a fixed ``translation'' in assembly. The idea is
+always the same: we \textbf{compare} with \code{cmp}, then we \textbf{jump} depending on the result.
+
+\newcommand{\stk}[1]{\begin{tabular}[t]{@{}l@{}}#1\end{tabular}}
+\begin{center}
+\small
+\begin{tabular}{|l|l|l|}
+    \hline
+    \ras{Structure} & \ras{In C} & \ras{In assembly} \\ \hline
+    if & \code{if (a == b) x = 1;} &
+        \stk{\code{    cmp a, b}\\ \code{    jne end}\\ \code{    mov x, 1}\\ \code{end:}} \\ \hline
+    while & \code{while (cx > 0) \{ ... \}} &
+        \stk{\code{L:  cmp cx, 0}\\ \code{    jle end}\\ \code{    ...}\\ \code{    jmp L}\\ \code{end:}} \\ \hline
+    for & \code{for (cx = 10; cx > 0; cx--)} &
+        \stk{\code{    mov cx, 10}\\ \code{L:  ...}\\ \code{    loop L}} \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{intabih}
+    In the translation of \code{if}, we jump with the \textbf{opposite} condition (\code{jne} instead of \code{je}).
+    We tell the processor: ``if they are not equal, skip the assignment''. This makes the program shorter.
+\end{intabih}
+
+\subsection{Loops and repetition}
+\begin{tarif}
+    \code{loop L} is like two instructions: \code{dec cx}, then ``if CX $\neq 0$, jump to L''.
+    So CX is the loop counter.
+\end{tarif}
+
+\subsubsection{The sum of the numbers from 1 to 10}
+\asm{ch3/loopsum.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|}
+    \hline
+    \ras{Turn} & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 \\ \hline
+    \ras{CX before \code{add}} & 10 & 9 & 8 & 7 & 6 & 5 & 4 & 3 & 2 & 1 \\ \hline
+    \ras{AX after \code{add}} & 10 & 19 & 27 & 34 & 40 & 45 & 49 & 52 & 54 & \cell{orangeDeep}{\textbf{55}} \\ \hline
+\end{tabular}
+\end{center}
+After the tenth turn CX = 0, so the loop stops, and AX = \hex{0037} = 55. Notice that we add backwards:
+$10 + 9 + \dots + 1$, and the result is the same.
+
+\begin{intabih}
+    If we enter the loop with CX = 0, \code{loop} first decreases CX, which becomes \hex{FFFF}, and then repeats
+    65535 more times! To avoid this, we put \code{jcxz end} before the loop: ``if CX = 0, jump to the end''.
+\end{intabih}
+
+\subsubsection{Finding the biggest value in an array}
+\asm{ch3/maxarray.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|c|}
+    \hline
+    \ras{SI points to} & \ras{Element} & \ras{Element $>$ AL?} & \ras{AL after} & \ras{CX after \code{loop}} \\ \hline
+    tab[0] & 14 & no (equal) & 14 & 5 \\ \hline
+    tab[1] & 3 & no & 14 & 4 \\ \hline
+    tab[2] & 27 & yes & 27 & 3 \\ \hline
+    tab[3] & 9 & no & 27 & 2 \\ \hline
+    tab[4] & 31 & yes & \cell{orangeDeep}{\textbf{31}} & 1 \\ \hline
+    tab[5] & 8 & no & 31 & 0 \\ \hline
+\end{tabular}
+\end{center}
+The result: AL = \hex{1F} = 31, stored in \code{max}. We used \code{jbe} because the values are \textbf{unsigned}.
+
+\subsubsection{Repetition with the \code{rep} prefix}
+String instructions work on DS:SI (the source) and ES:DI (the destination), and the prefix \code{rep}
+repeats them CX times.
+
+\asm{ch3/repmovs.asm}
+\screen{ch3/repmovs.out}
+
+\begin{sharh}
+    \s{7}{\code{cld}: set DF = 0, so SI and DI increase after each copy.}
+    \s{8}{\code{rep movsb} copies one byte from [SI] to [DI], and repeats 6 times: the five letters and \code{\$}.}
+\end{sharh}
+
+\subsection{Generating machine code}
+The assembler turns each instruction into bytes. These are the real bytes of the program \code{machine.asm}:
+
+\asm{ch3/machine.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|l|}
+    \hline
+    \ras{Address} & \ras{Machine code (hex)} & \ras{Instruction} \\ \hline
+    0100 & {\codefont B8 34 12} & \code{mov ax, 1234h} \\ \hline
+    0103 & {\codefont 89 C3} & \code{mov bx, ax} \\ \hline
+    0105 & {\codefont 04 05} & \code{add al, 5} \\ \hline
+    0107 & {\codefont 88 07} & \code{mov [bx], al} \\ \hline
+    0109 & {\codefont 41} & \code{inc cx} \\ \hline
+    010A & {\codefont EB 01} & \code{jmp fin} \\ \hline
+    010C & {\codefont 90} & \code{nop} \\ \hline
+    010D & {\codefont C3} & \code{ret} \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: decoding B8 34 12]
+    \begin{enumerate}
+        \item B8 = \bin{1011\,1000}: the first five bits 10111 mean ``\code{mov} an immediate value into a 16-bit register'',
+              and the last three bits 000 are the number of the register AX.
+        \item 34 12: the value \hex{1234}, written with the small byte first (little endian).
+    \end{enumerate}
+\end{khatwa}
+
+\begin{khatwa}[: decoding 89 C3 (\code{mov bx, ax})]
+    The first byte 89 = \bin{100010\,0\,1}:
+    \begin{itemize}
+        \item 100010: the opcode of \code{mov} between a register and a register or memory.
+        \item d = 0: the register named in the \emph{reg} field is the \textbf{source}.
+        \item w = 1: we work on 16 bits (if it were 0 we would work on 8 bits).
+    \end{itemize}
+    The second byte C3 = \bin{11\,000\,011} is called ModR/M:
+    \begin{center}
+    \begin{tikzpicture}[f/.style={draw=brandDark, thick, minimum height=0.7cm, font=\codefont\bfseries}]
+        \node[f, minimum width=1.6cm, fill=brandOrange!20] (m) at (0,0) {11};
+        \node[f, minimum width=2.2cm, fill=brandTeal!20, anchor=west] (r) at (m.east) {000};
+        \node[f, minimum width=2.2cm, fill=brandGreen!20, anchor=west] (rm) at (r.east) {011};
+        \node[below=0.1cm of m, font=\small] {mod: register};
+        \node[below=0.1cm of r, font=\small] {reg = AX};
+        \node[below=0.1cm of rm, font=\small] {r/m = BX};
+    \end{tikzpicture}
+    \end{center}
+    So: move AX (the source) into BX.
+\end{khatwa}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+    \hline
+    \ras{Number} & 000 & 001 & 010 & 011 & 100 & 101 & 110 & 111 \\ \hline
+    \ras{w = 1} & AX & CX & DX & BX & SP & BP & SI & DI \\ \hline
+    \ras{w = 0} & AL & CL & DL & BL & AH & CH & DH & BH \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{mithal}[: 88 07 and EB 01]
+    88 = \bin{100010\,0\,0}: \code{mov} on 8 bits. 07 = \bin{00\,000\,111}: mod = 00 (memory without offset),
+    reg = 000 (AL), r/m = 111 ([BX]). So \code{mov [bx], al}.\\[3pt]
+    EB 01: a short jump, and the offset is \textbf{relative}: after reading \code{jmp}, IP = \hex{010C}, and we add 1
+    to reach \hex{010D} (\code{fin}). This is how we jumped over \code{nop}.
+\end{mithal}
+
+%================================================
+\section{Input and output}
+%================================================
+
+\subsection{Ports: \code{in} and \code{out}}
+The processor talks with devices through numbered \term{ports}{ports d'entrée/sortie}, from 0 to \hex{FFFF}.
+\begin{itemize}
+    \item \code{in al, 60h}: read one byte from port \hex{60} (the keyboard in a PC).
+    \item \code{out 61h, al}: send AL to port \hex{61} (the speaker).
+\end{itemize}
+Normal programs rarely use ports directly; they ask the operating system through interrupts.
+
+\subsection{DOS services: the \code{int 21h} interrupt}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|c|R|R|}
+    \hline
+    \ras{AH} & \ras{Function} & \ras{Inputs and outputs} \\ \hline
+    \hex{01} & read a key from the keyboard and show it & output: the character in AL \\ \hline
+    \hex{02} & print a character & input: the character in DL \\ \hline
+    \hex{09} & print a string ending with \code{\$} & input: its address in DX \\ \hline
+    \hex{4C} & end the program & AL = exit code \\ \hline
+\end{tabularx}
+\end{center}
+
+\asm{ch3/io.asm}
+\screen{ch3/io.out}
+
+\begin{sharh}
+    \s{7--8}{Wait for the user to press a key (here \code{m}); its ASCII code arrives in AL: 109.}
+    \s{9}{In the ASCII table, a capital letter is 32 less than the small one: $109 - 32 = 77$, which is the code of \code{'M'}.}
+    \s{10}{Keep the letter in BL, because the printing on line 13 changes AL.}
+    \s{14--16}{Function \hex{02} prints the character that is in DL.}
+    \s{20}{\code{13, 10}: back to the start of the line, then a new line.}
+\end{sharh}
+
+%================================================
+\section{The stack}
+%================================================
+
+\begin{tarif}
+    The \term{stack}{pile}: a zone of memory where we put values and take them back with the rule
+    \textbf{last in, first out} (LIFO). Its top is given by SS:SP.
+\end{tarif}
+
+\begin{tashbih}
+    The stack is like a \textbf{pile of plates}: we put the new plate on top of the pile, and we always take the plate on top.
+\end{tashbih}
+
+\begin{itemize}
+    \item \code{push ax}: \nql{SP}{SP - 2}, then write AX at [SP].
+    \item \code{pop ax}: read [SP] into AX, then \nql{SP}{SP + 2}.
+\end{itemize}
+
+\begin{intabih}
+    In the 8086 the stack \textbf{grows towards small addresses}: each \code{push} decreases SP. And we always
+    put and take \textbf{words} (16 bits).
+\end{intabih}
+
+\asm{ch3/stack.asm}
+
+\begin{center}
+\begin{tikzpicture}[c/.style={draw=brandDark, fill=white, minimum width=1.6cm, minimum height=0.55cm, font=\codefont\small},
+    a/.style={font=\codefont\scriptsize, text=tealDeep}]
+    \foreach \t/\x/\v/\w/\sp in {{start}/0/{}/{}/FFFE, {after \code{push ax}}/3.3/1111/{}/FFFC,
+                                {after \code{push bx}}/6.6/1111/2222/FFFA, {after \code{pop ax}}/9.9/1111/{}/FFFC} {
+        \node[font=\small\bfseries] at (\x,1.1) {\t};
+        \node[c] (u) at (\x,0.3) {\v};
+        \node[c] (d) at (\x,-0.25) {\w};
+        \node[a, left=0.05cm of u] {FFFC};
+        \node[a, left=0.05cm of d] {FFFA};
+        \node[font=\codefont\small] at (\x,-1) {SP = \sp};
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabular}{|c|l|c|c|c|}
+    \hline
+    \ras{Line} & \ras{Instruction} & \ras{AX} & \ras{BX} & \ras{SP} \\ \hline
+    4--5 & \code{mov ax}, \code{mov bx} & 1111 & 2222 & FFFE \\ \hline
+    6 & \code{push ax} & 1111 & 2222 & \cell{orangeDeep}{FFFC} \\ \hline
+    7 & \code{push bx} & 1111 & 2222 & \cell{orangeDeep}{FFFA} \\ \hline
+    8 & \code{pop ax} & \cell{orangeDeep}{2222} & 2222 & FFFC \\ \hline
+    9 & \code{pop bx} & 2222 & \cell{orangeDeep}{1111} & FFFE \\ \hline
+\end{tabular}
+\end{center}
+Because the last value in (\hex{2222}) is the first value out, AX and BX have swapped their values.
+
+\subsection{Why do we need a stack?}
+\begin{enumerate}
+    \item \textbf{To keep return addresses}: when we call a procedure, the processor keeps in the stack where it must come back.
+    \item \textbf{To keep registers for a while}: a procedure needs CX, but CX is used by a loop? We write
+          \code{push cx} at its start and \code{pop cx} at its end, so the loop counter is not lost.
+    \item \textbf{To pass parameters} to procedures (we see it soon).
+    \item \textbf{Interrupts}: the processor keeps its state there before going to the interrupt handler.
+\end{enumerate}
+
+\begin{intabih}
+    The number of \code{pop} must equal the number of \code{push}, in the opposite order. \code{push ax} then
+    \code{push bx} must be matched by \code{pop bx} then \code{pop ax}. If you forget one \code{pop} inside a
+    procedure, \code{ret} takes a wrong value as the return address, and the program jumps to a random place.
+\end{intabih}
+
+%================================================
+\section{Functions and procedures}
+%================================================
+
+\begin{tarif}
+    A \term{procedure}{procédure, sous-programme}: a group of instructions with a name. We call it with
+    \code{call} and come back from it with \code{ret}. We write it once and use it many times.
+\end{tarif}
+
+\subsection{How does \code{ret} know where to go back?}
+\begin{itemize}
+    \item \code{call P}: puts on the stack \textbf{the address of the instruction after it} (IP), then jumps to P.
+    \item \code{ret}: takes this address from the stack and puts it into IP, so execution goes back after \code{call}.
+\end{itemize}
+
+\begin{khatwa}[: the two calls in the next program (real addresses)]
+    \begin{enumerate}
+        \item The first \code{call print\_num} is at offset \hex{0103} and is 3 bytes long, so the next instruction is
+              at \hex{0106}. The processor puts \hex{0106} on the stack, then jumps to \code{print\_num}.
+        \item At the end of the procedure, \code{ret} takes \hex{0106} from the stack: execution goes back to \code{mov ax, 7}.
+        \item The second call is at \hex{0109}, so it puts \hex{010C}, and this time \code{ret} goes back to \hex{010C}.
+    \end{enumerate}
+    The same procedure goes back to two different places, because the return address is kept in the stack each time.
+\end{khatwa}
+
+\subsection{A procedure that prints a number in decimal}
+\code{int 21h} only prints characters. To print the number 2026, we must take out its digits one by one:
+
+\begin{khatwa}[: taking out the digits of 2026]
+    \begin{center}
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        \ras{Operation} & \ras{Quotient (AX)} & \ras{Remainder (DX)} & \ras{Stack} \\ \hline
+        $2026 \div 10$ & 202 & 6 & 6 \\ \hline
+        $202 \div 10$ & 20 & 2 & 6, 2 \\ \hline
+        $20 \div 10$ & 2 & 0 & 6, 2, 0 \\ \hline
+        $2 \div 10$ & 0 (we stop) & 2 & 6, 2, 0, 2 \\ \hline
+    \end{tabular}
+    \end{center}
+    The digits come out backwards (6, 2, 0, 2). We put them on the stack, then take them back: they come out in
+    the right order 2, 0, 2, 6.
+\end{khatwa}
+
+\asm{ch3/procnum.asm}
+\screen{ch3/procnum.out}
+
+\begin{sharh}
+    \s{4--5}{Put the number in AX (the parameter), then call the procedure.}
+    \s{10}{\code{proc} and \code{endp} mark the start and the end of the procedure.}
+    \s{14}{DX = 0 is needed before \code{div bx} (a 16-bit division divides DX:AX).}
+    \s{16--17}{Put the digit on the stack, and count the digits in CX.}
+    \s{21--25}{CX times: take a digit, turn it into a character by adding \code{'0'} (48), and print it.}
+    \s{28}{\code{ret} goes back to line 6 the first time, and to line 8 the second time.}
+\end{sharh}
+
+\subsection{Passing parameters on the stack}
+\asm{ch3/procstack.asm}
+
+After \code{mov bp, sp} on line 14, the stack looks like this (values from the real run):
+
+\begin{center}
+\begin{tikzpicture}[c/.style={draw=brandDark, fill=white, minimum width=3.6cm, minimum height=0.6cm, font=\small},
+    a/.style={font=\codefont\small, text=tealDeep}]
+    \foreach \ad/\v/\l [count=\i from 0] in {FFFC/{30 (2nd parameter)}/{BP+6}, FFFA/{12 (1st parameter)}/{BP+4},
+                                           FFF8/{return address 010B}/{BP+2}, FFF6/{old BP}/{BP}} {
+        \node[c] (n\i) at (0,-0.6*\i) {\v};
+        \node[a, left=0.15cm of n\i] {\ad};
+        \node[font=\codefont\small\bfseries, right=0.15cm of n\i] {\l};
+    }
+    \draw[sahmO] (4.6,-1.8) node[right, font=\small] {SP = BP = FFF6} -- (3.0,-1.8);
+\end{tikzpicture}
+\end{center}
+
+\begin{sharh}
+    \s{4--7}{Put the two parameters on the stack: SP goes from \hex{FFFE} to \hex{FFFA}.}
+    \s{8}{\code{call} puts the return address \hex{010B}: SP = \hex{FFF8}.}
+    \s{13--14}{Save BP, then make BP stay fixed on the top of the stack (\hex{FFF6}).}
+    \s{15--16}{The first parameter is at [BP+4], the second at [BP+6]: $12 + 30 = 42$.}
+    \s{18}{\code{ret 4}: go back, then remove 4 bytes (the two parameters) from the stack. SP goes back to \hex{FFFE}.}
+\end{sharh}
+
+%================================================
+\section{Interrupts}
+%================================================
+
+\begin{tarif}
+    An \term{interrupt}{interruption}: an event that stops the current program for a moment, so the processor
+    runs a special program (the \textbf{interrupt handler}), then comes back to continue where it stopped.
+\end{tarif}
+
+\begin{tashbih}
+    You are reading a book and the \textbf{doorbell} rings. You put a bookmark in the page, open the door, then
+    come back and continue reading from the same page. The bell is the interrupt, and the bookmark is what the
+    processor keeps in the stack.
+\end{tashbih}
+
+\subsection{Kinds of interrupts}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3cm}|R|R|}
+    \hline
+    \ras{Kind} & \ras{Who causes it?} & \ras{Examples} \\ \hline
+    hardware & an outside device sends a signal on the INTR or NMI pin & a key press, the clock, the printer is ready \\ \hline
+    software & the instruction \code{int n} in the program & \code{int 21h} for DOS services \\ \hline
+    exceptions & the processor itself, after an error & division by zero (interrupt 0) \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{The interrupt vector table}
+At the start of memory (from \hex{00000} to \hex{003FF}) there is a table of 256 entries. Each interrupt has
+4 bytes: the offset, then the segment, of its handler.
+
+\begin{tarif}
+    \centering
+    The vector of interrupt number $n$ is at address: \quad $4 \times n$
+\end{tarif}
+
+\begin{mithal}
+    The vector of \code{int 21h}: $\hex{21} \times 4 = 33 \times 4 = 132 = \hex{84}$. So the address of the DOS
+    handler is kept from \hex{00084} to \hex{00087}.
+\end{mithal}
+
+\subsection{What does the processor do on \code{int n}?}
+\begin{enumerate}
+    \item It puts FLAGS on the stack, then switches IF and TF off.
+    \item It puts CS, then IP, on the stack (the bookmark in the book).
+    \item It reads the new IP and CS from the entry $n \times 4$, so it jumps to the interrupt handler.
+    \item At the end of the handler, \code{iret} takes IP, CS and FLAGS back from the stack, and the program continues.
+\end{enumerate}
+
+\subsection{A hardware interrupt, step by step}
+\begin{khatwa}[: you press a key while a program runs]
+    \begin{enumerate}
+        \item The keyboard sends a signal to the \term{interrupt controller}{contrôleur d'interruptions} (PIC 8259).
+        \item The controller sends a signal on the INTR input of the processor.
+        \item If IF = 1, the processor first finishes the \textbf{current instruction}, then accepts the interrupt.
+        \item The controller gives the processor the interrupt number (\hex{09} for the keyboard).
+        \item The processor saves FLAGS, CS and IP, then jumps to the address written at $4 \times 9 = \hex{24}$.
+        \item The handler reads the key from port \hex{60}, keeps it, then runs \code{iret}.
+        \item The program continues from where it stopped, without ``noticing'' anything.
+    \end{enumerate}
+\end{khatwa}
+
+\begin{tarif}
+    \begin{itemize}
+        \item \code{cli} (clear IF) blocks hardware interrupts for a while, and \code{sti} (set IF) allows them again.
+              We use them when a sensitive part of the program must not be interrupted.
+        \item The NMI input (Non Maskable Interrupt): an interrupt that \textbf{cannot be blocked}, used for serious
+              errors such as a memory fault or a power failure.
+    \end{itemize}
+\end{tarif}
+
+\subsection{A program: our own interrupt}
+\asm{ch3/myint.asm}
+\screen{ch3/myint.out}
+
+\begin{sharh}
+    \s{4--5}{ES = 0: we want to write in the vector table, which is in segment 0.}
+    \s{6--8}{Write the address of \code{handler} in entry $\hex{60} \times 4 = \hex{180}$: the offset, then the segment.}
+    \s{10--11}{Each \code{int 60h} runs \code{handler}: the first time it prints \code{A}, the second time \code{B}.}
+    \s{19}{\code{iret} and not \code{ret}, because the interrupt also put FLAGS on the stack.}
+\end{sharh}
+
+%================================================
+\section{Exercises}
+%================================================
+
+\begin{tamrin}
+    Compute the physical address in each case: (a) DS = 3000H, BX = 0050H with \code{mov al, [bx]}.
+    (b) SS = 4000H, SP = FFFEH.
+\end{tamrin}
+\begin{hall}
+    (a) $\hex{30000} + \hex{0050} = \hex{30050}$. \quad (b) $\hex{40000} + \hex{FFFE} = \hex{4FFFE}$.
+\end{hall}
+
+\begin{tamrin}
+    What is AX after these instructions? \code{mov ax, 0F0Fh}, then \code{and ax, 00FFh}, then \code{shl ax, 1}.
+\end{tamrin}
+\begin{hall}
+    After \code{and}: \hex{000F}. After the shift (multiply by 2): \hex{001E} = 30.
+\end{hall}
+
+\begin{tamrin}
+    Write a program that computes $5! = 1 \times 2 \times 3 \times 4 \times 5$ with the \code{loop} instruction, and puts the result in AX.
+\end{tamrin}
+\begin{hall}
+    \asm{ch3/ex_fact.asm}
+    The result: AX = 0078 = 120 (tested in the emulator).
+\end{hall}
+
+\begin{tamrin}
+    After \code{mov sp, 0100h}, then \code{push ax}, then \code{push bx}, then \code{pop cx}: what is SP, and which value is in CX?
+\end{tamrin}
+\begin{hall}
+    After the two pushes SP = \hex{00FC}, and after \code{pop} SP = \hex{00FE}. CX gets the last value in: the value of BX.
+\end{hall}
+
+\begin{tamrin}
+    What is the vector address of interrupt number \hex{10} (BIOS screen services)?
+\end{tamrin}
+\begin{hall}
+    $\hex{10} \times 4 = 16 \times 4 = 64 = \hex{40}$: the bytes from \hex{00040} to \hex{00043}.
+\end{hall}
+
+\begin{tamrin}
+    Decode the instruction 89 D8.
+\end{tamrin}
+\begin{hall}
+    89: \code{mov} on 16 bits, d = 0. D8 = \bin{11\,011\,000}: mod = 11 (register), reg = 011 (BX, the source),
+    r/m = 000 (AX). So: \code{mov ax, bx}.
+\end{hall}

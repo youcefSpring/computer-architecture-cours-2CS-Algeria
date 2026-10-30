@@ -1,0 +1,486 @@
+\chapter{Case Study: 32-bit and 64-bit Processors}
+
+\begin{khulasa}[: what will we learn in this chapter?]
+\begin{itemize}
+    \item Why we moved from 16 bits to 32 and then 64 bits, and what changed.
+    \item How the architecture grew from IA-32 to AMD64.
+    \item The registers of modern processors, and flat addressing.
+    \item New instructions: SSE and AVX, which compute several numbers at the same time.
+    \item The pipeline: how the processor runs several instructions at the same time.
+\end{itemize}
+\end{khulasa}
+
+\begin{intabih}
+    The programs of this chapter are written in \textbf{NASM} syntax for \textbf{Linux}, and we really ran them on an
+    Intel Core i7-8665U processor (4 cores). To assemble and run:
+    \code{nasm -f elf64 prog.asm}, then \code{ld prog.o -o prog}, then \code{./prog}.
+\end{intabih}
+
+%================================================
+\section{From 16 to 32, then 64 bits}
+%================================================
+
+\begin{tarif}
+    We say a processor is an \textbf{$n$-bit} processor when its \textbf{general registers} are $n$ bits wide: this is
+    the size of the number it computes in one instruction, and the size of the address it can keep in a register.
+\end{tarif}
+
+\subsection{The main differences}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.2cm}|C|C|C|}
+    \hline
+    \ras{} & \ras{16 bits (8086)} & \ras{32 bits (IA-32)} & \ras{64 bits (x86-64)} \\ \hline
+    biggest unsigned number & $2^{16}-1 = 65\,535$ & $2^{32}-1 \approx 4.3$ billion & $2^{64}-1 \approx 1.8 \times 10^{19}$ \\ \hline
+    max memory & 1 MB (with segments) & 4 GB & 256 TB (48 bits in practice) \\ \hline
+    general registers & 8 & 8 & \textbf{16} \\ \hline
+    register names & AX, BX, \dots & EAX, EBX, \dots & RAX, RBX, \dots, R15 \\ \hline
+    addressing & segmented & flat (in practice) & flat \\ \hline
+\end{tabularx}
+\end{center}
+
+\subsection{Why do we need more than 32 bits?}
+\begin{enumerate}
+    \item \textbf{Memory}: with a 32-bit address we cannot use more than 4 GB. Today's computers have 16 or 32 GB,
+          and servers have hundreds of gigabytes.
+    \item \textbf{Performance}: a 64-bit register computes a big number in one instruction, while a 32-bit processor needs
+          at least two instructions (like \code{add} and \code{adc} in Chapter 3). And twice as many registers (16 instead of 8)
+          means fewer trips to memory.
+    \item \textbf{Compatibility}: a 64-bit processor also runs old 32-bit programs without any change.
+\end{enumerate}
+
+\begin{khatwa}[: what does ``4 GB'' mean exactly?]
+    \begin{enumerate}
+        \item A 32-bit address can take $2^{32}$ different values.
+        \item $2^{32} = 2^{2} \times 2^{30} = 4 \times 2^{30}$.
+        \item And $2^{30}$ bytes $= 1$ GB, so the maximum size is 4 GB.
+    \end{enumerate}
+    With 48 bits: $2^{48} = 2^{8} \times 2^{40} = 256$ TB, that is 65536 times bigger!
+\end{khatwa}
+
+%================================================
+\section{How the architecture grew: from IA-32 to AMD64}
+%================================================
+
+\begin{center}
+\begin{tikzpicture}[e/.style={unit=#1, minimum width=2.9cm, minimum height=1.3cm, font=\small}]
+    \node[e=brandMuted] (a) at (0,0) {8086 (1978)\\16 bits, segments};
+    \node[e=brandPurple] (b) at (3.6,0) {80286 (1982)\\protected mode};
+    \node[e=brandTeal] (c) at (7.2,0) {80386 (1985)\\\textbf{IA-32}};
+    \node[e=brandOrange] (d) at (10.8,0) {AMD64 (2003)\\\textbf{64 bits}};
+    \draw[sahmT] (a) -- (b); \draw[sahmT] (b) -- (c); \draw[sahmT] (c) -- (d);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{IA-32} (Intel Architecture 32 bits): it started with the 80386. Registers became 32 bits wide
+          (EAX: the E means \emph{Extended}), and the \textbf{protected mode} appeared: it stops programs from writing in each other's memory.
+    \item \textbf{AMD64}: the surprise is that AMD (not Intel) designed the 64-bit extension in 2003, while keeping
+          compatibility. Intel adopted it later as Intel 64. Today we call it x86-64.
+\end{itemize}
+
+\subsection{The working modes of the processor}
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.3cm}|R|R|}
+    \hline
+    \ras{Mode} & \ras{Description} & \ras{When?} \\ \hline
+    real mode & behaves like an 8086: 16 bits and 1 MB & when the computer starts, before the operating system \\ \hline
+    protected mode & 32 bits, memory protection & 32-bit systems \\ \hline
+    long mode & 64 bits, with a sub-mode to run 32-bit programs & all modern systems \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{hal}
+    Every modern computer wakes up ``thinking'' it is an 8086! It starts in real mode, then the operating system moves
+    it to protected mode, then to long mode. This is how the architecture stays compatible since 1978.
+\end{hal}
+
+%================================================
+\section{Registers in 32-bit and 64-bit processors}
+%================================================
+
+\subsection{Nested registers}
+Each new register \textbf{contains} the old register in its right half (the low bits):
+
+\begin{center}
+\begin{tikzpicture}[b/.style={draw=brandDark, thick, minimum height=0.75cm, font=\codefont\bfseries}]
+    \node[b, minimum width=12cm, fill=brandOrange!15, anchor=east] (r) at (6,1.6) {RAX: 64 bits};
+    \node[b, minimum width=6cm, fill=brandTeal!15, anchor=east] (e) at (6,0.8) {EAX: 32 bits};
+    \node[b, minimum width=3cm, fill=brandGreen!20, anchor=east] (x) at (6,0) {AX: 16};
+    \node[b, minimum width=1.5cm, fill=brandPurple!20, anchor=east] (h) at (4.5,-0.8) {AH};
+    \node[b, minimum width=1.5cm, fill=brandPurple!35, anchor=east] (l) at (6,-0.8) {AL};
+    \foreach \x/\t in {6/0, 4.5/8, 3/16, 0/32, -6/64} \node[font=\codefont\scriptsize] at (\x,-1.45) {\t};
+    \draw[brandMuted, dashed] (0,-1.25) -- (0,1.2); \draw[brandMuted, dashed] (3,-1.25) -- (3,0.4);
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|l|}
+    \hline
+    \ras{64 bits} & \ras{32 bits} & \ras{16 bits} & \ras{8 bits} & \ras{Usual use} \\ \hline
+    RAX & EAX & AX & AL & value returned by a function \\ \hline
+    RBX & EBX & BX & BL & general \\ \hline
+    RCX & ECX & CX & CL & counter, 4th parameter \\ \hline
+    RDX & EDX & DX & DL & 3rd parameter \\ \hline
+    RSI & ESI & SI & SIL & 2nd parameter \\ \hline
+    RDI & EDI & DI & DIL & 1st parameter \\ \hline
+    RSP & ESP & SP & SPL & top of the stack \\ \hline
+    RBP & EBP & BP & BPL & base of the stack frame \\ \hline
+    R8 \dots\ R15 & R8D \dots\ R15D & R8W \dots & R8B \dots & \textbf{new in 64 bits} \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{itemize}
+    \item \textbf{RIP}: the instruction pointer (it was IP, then EIP).
+    \item \textbf{RFLAGS}: the flags register; ZF, CF, SF, OF are in the same place as in the 8086.
+    \item \textbf{Segment registers}: they still exist (CS, DS\dots) but their base is 0 in 64-bit mode, except FS and GS,
+          which the system uses for data that belongs to each thread.
+\end{itemize}
+
+\subsection{A test: what happens to the other bits?}
+\asm{ch4/regs64.asm}
+\screen{ch4/regs64.out}
+
+\begin{sharh}
+    \s{5--6}{Put a 64-bit number in RAX and show it: 1122334455667788.}
+    \s{9}{Writing EAX (32 bits) \textbf{clears} the high half: 00000000AABBCCDD.}
+    \s{13}{Writing AX (16 bits) keeps the other bits: \dots 5566\textbf{1234}.}
+    \s{17}{Writing AL changes only the last byte: \dots 77\textbf{FF}.}
+    \s{24--42}{A procedure that shows RAX in hexadecimal: at each turn it rotates 4 bits, keeps them with the mask \code{0xF}, and turns them into a character.}
+\end{sharh}
+
+\begin{intabih}
+    A strange but important rule: in 64-bit mode, \textbf{every write to a 32-bit register clears the high bits}, but a
+    write to 8 or 16 bits does not. AMD designed this rule to make the processor faster.
+\end{intabih}
+
+%================================================
+\section{Advanced addressing modes}
+%================================================
+
+\subsection{From segmented addressing to flat addressing}
+\begin{center}
+\begin{tikzpicture}
+    \draw[thick, fill=brandLight] (-6,0) rectangle (-4,-4);
+    \foreach \y/\c in {0/brandTeal, -1.3/brandOrange, -2.6/brandGreen} \fill[\c!30] (-6,\y) rectangle (-4,\y-1.2);
+    \foreach \y/\t in {-0.6/CS, -1.9/DS, -3.2/SS} \node[font=\codefont] at (-5,\y) {\t};
+    \node[font=\small\bfseries, align=center] at (-5,0.6) {segmented (8086)};
+    \node[font=\scriptsize, text width=4cm, align=center] at (-5,-4.6) {zones of 64 KB, and address = segment:offset};
+    \draw[thick, fill=brandTeal!15] (0,0) rectangle (2,-4);
+    \node[font=\small, align=center] at (1,-2) {one single\\space};
+    \node[font=\small\bfseries, align=center] at (1,0.6) {flat (x86-64)};
+    \node[font=\scriptsize, text width=4cm, align=center] at (1,-4.6) {address = one number from 0 to the end};
+    \draw[sahmO] (-3.6,-2) -- (-0.4,-2);
+\end{tikzpicture}
+\end{center}
+
+In the \term{flat memory model}{modèle mémoire plat}, the program sees memory \textbf{as one long strip} of bytes,
+numbered from 0. We do not need to compute ``segment $\times$ 16 + offset'': the address is just a number in a 64-bit register.
+
+\begin{tashbih}
+    Segmented addressing is like saying ``building 12, floor 3''. Flat addressing is like giving every flat in the
+    town one unique number: ``flat number 73\,502''. Much simpler, as long as we have big enough numbers.
+\end{tashbih}
+
+\subsection{The general form of an address}
+\begin{tarif}
+    \centering
+    $\text{address} = \text{base} + \text{index} \times \text{scale} + \text{displacement}$
+    \par\small
+    base and index: any two registers. scale: 1, 2, 4 or 8. displacement: a fixed number.
+\end{tarif}
+
+\begin{center}
+\small
+\begin{tabular}{|l|l|}
+    \hline
+    \ras{Writing (NASM)} & \ras{Use} \\ \hline
+    \code{[rbx]} & base only: a pointer \\ \hline
+    \code{[rbx + 16]} & base + displacement: a field in a structure (struct) \\ \hline
+    \code{[tab + rcx*8]} & index $\times$ scale + displacement: element i of an array of 8-byte numbers \\ \hline
+    \code{[rbx + rcx*4 + 8]} & everything together \\ \hline
+    \code{[rel msg]} & relative to RIP: special to 64 bits \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: where does \code{[tab + rcx*8]} read when RCX = 3?]
+    \begin{enumerate}
+        \item Each element of \code{tab} is a 64-bit number = 8 bytes (\code{dq}).
+        \item Element number 3 (the fourth one, because we start at 0) is $3 \times 8 = 24$ bytes from the start.
+        \item If \code{tab} is at address \hex{402000}, the address is $\hex{402000} + 24 = \hex{402018}$.
+    \end{enumerate}
+    The scale saves us from multiplying the index ourselves: the processor does it inside the instruction.
+\end{khatwa}
+
+\asm{ch4/sum64.asm}
+\screen{ch4/sum64.out}
+
+\begin{sharh}
+    \s{5--6}{\code{xor} of a register with itself = 0: the sum and the index start at 0.}
+    \s{8}{Addressing \textbf{with a scale}: read element i of the array, and add it to RAX.}
+    \s{9--11}{\code{i++}, then ``while i < 5'' go back. This is a \code{while} loop, as in Chapter 3.}
+    \s{18--36}{The same method as in Chapter 3 to print a number in decimal (divide by 10), but with 64-bit registers.}
+    \s{39}{\code{dq} (define quad-word): 64-bit numbers. The first number ($10^{12}$) does not fit in 32 bits.}
+\end{sharh}
+
+\subsection{RIP-relative addressing}
+In 64-bit mode we often write \code{lea rsi, [rel buf]}: the address is computed \textbf{relative to the current
+instruction} ($\text{RIP} + \text{distance}$). The benefit: the program works wherever the system puts it in memory.
+This is important for security (the system moves programs at each run so attackers cannot guess the addresses).
+
+%================================================
+\section{The instruction set}
+%================================================
+
+\subsection{The same instruction on 16, 32 and 64 bits}
+We assembled the program below; these are the real machine-code bytes:
+
+\asm{ch4/same.asm}
+
+\begin{center}
+\small
+\begin{tabular}{|l|l|l|}
+    \hline
+    \ras{Instruction} & \ras{Machine code} & \ras{Note} \\ \hline
+    \code{add ax, bx} & {\codefont \textcolor{orangeDeep}{66} 01 D8} & prefix 66: ``careful, 16 bits'' \\ \hline
+    \code{add eax, ebx} & {\codefont 01 D8} & 32 bits is the default size \\ \hline
+    \code{add rax, rbx} & {\codefont \textcolor{orangeDeep}{48} 01 D8} & prefix REX.W = 48: ``64 bits'' \\ \hline
+    \code{add r8, r9} & {\codefont \textcolor{orangeDeep}{4D} 01 C8} & REX = 4D: 64 bits + new registers \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{khatwa}[: why is 01 D8 in the first three lines?]
+    \begin{enumerate}
+        \item 01 is the opcode ``add a register to a register or memory''. It is the same since the 8086.
+        \item D8 = \bin{11\,011\,000} is the ModR/M byte we saw in Chapter 3: mod = 11 (register), reg = 011 (BX), r/m = 000 (AX).
+        \item The size (16, 32 or 64) is not written in the instruction itself, but in a \textbf{prefix} before it. This is how
+              the old instructions stayed valid, and the new sizes were added ``from the outside''.
+        \item In 4D = \bin{0100\,1101}: 0100 means ``REX prefix'', then the bit W = 1 (64 bits), and two bits that add 8 to the
+              two register numbers, so AX becomes R8 and BX becomes R9.
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{Comparison: a 32-bit program and a 64-bit program}
+\textbf{In 32 bits:}
+\asm{ch4/hello32.asm}
+\screen{ch4/hello32.out}
+\textbf{In 64 bits:}
+\asm{ch4/hello64.asm}
+\screen{ch4/hello64.out}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{3.8cm}|C|C|}
+    \hline
+    \ras{} & \ras{32 bits} & \ras{64 bits} \\ \hline
+    asking the system for a service & \code{int 0x80} (an interrupt) & \code{syscall} (a special, faster instruction) \\ \hline
+    number of the \emph{write} service & 4 in EAX & 1 in RAX \\ \hline
+    parameters & EBX, ECX, EDX & RDI, RSI, RDX \\ \hline
+    size of an address & 4 bytes & 8 bytes \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{hal}
+    We ran the two programs on the same 64-bit computer. The 32-bit program worked without any change: this is the
+    compatibility sub-mode inside long mode.
+\end{hal}
+
+\subsection{What does the compiler write? From C to assembly}
+We wrote a function in C, and asked the compiler gcc to give us the assembly it produces, with the command
+\code{gcc -O1 -S -masm=intel sum.c}:
+
+\begin{center}
+\begin{minipage}[t]{0.47\linewidth}
+    \cfile{ch4/sum.c}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\linewidth}
+    \asm{ch4/sum_gcc.s}
+\end{minipage}
+\end{center}
+
+\begin{sharh}
+    \s{1}{By the Linux 64-bit rules: the first parameter (\code{t}) arrives in RDI, and the second one (\code{n}) in RSI.}
+    \s{2--3}{If $n \leq 0$ we jump to \code{.L4}: the result is 0.}
+    \s{5}{\code{lea} computes the address of the end of the array $t + n \times 8$ \textbf{without reading memory}.}
+    \s{8--11}{The loop: add the element, move 8 bytes forward, and stop at the end. The compiler used a pointer instead of the index \code{i}.}
+    \s{13--14}{The result is always returned in RAX.}
+\end{sharh}
+
+\subsection{SSE and AVX: computing several numbers at once}
+\begin{tarif}
+    \term{SIMD}{une instruction, données multiples} (Single Instruction, Multiple Data): one instruction applies the
+    same operation to \textbf{several numbers at the same time}.
+\end{tarif}
+
+\begin{center}
+\begin{tikzpicture}[c/.style={draw=brandDark, thick, minimum width=1.3cm, minimum height=0.65cm, font=\codefont}]
+    \foreach \v [count=\i from 0] in {1.5, 2.5, 3.5, 4.5} \node[c, fill=brandTeal!15] at (1.3*\i,1.6) {\v};
+    \foreach \v [count=\i from 0] in {10, 20, 30, 40} \node[c, fill=brandOrange!15] at (1.3*\i,0.6) {\v};
+    \foreach \v [count=\i from 0] in {11.5, 22.5, 33.5, 44.5} \node[c, fill=brandGreen!20] at (1.3*\i,-0.9) {\v};
+    \draw[very thick] (-0.7,0.1) -- (4.6,0.1);
+    \node[font=\codefont\bfseries] at (-1.1,0.6) {+};
+    \node[font=\small, anchor=west] at (4.8,1.6) {XMM0 (128 bits = 4 numbers)};
+    \node[font=\small, anchor=west] at (4.8,-0.9) {result: \textbf{one instruction} \code{addps}};
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabular}{|c|c|c|c|c|}
+    \hline
+    \ras{Extension} & \ras{Year} & \ras{Registers} & \ras{Size} & \ras{floats at once} \\ \hline
+    SSE & 1999 & XMM0--XMM15 & 128 bits & 4 \\ \hline
+    AVX & 2011 & YMM0--YMM15 & 256 bits & 8 \\ \hline
+    AVX-512 & 2016 & ZMM0--ZMM31 & 512 bits & 16 \\ \hline
+\end{tabular}
+\end{center}
+
+\cfile{ch4/simd.c}
+\screen{ch4/simd.out}
+
+When we open the compiled program, we really find the instruction:
+\begin{codebox}\codefont\small
+    addps \ xmm0, XMMWORD PTR [rbp-0x50] \quad \textcolor{red!75!black}{; 4 additions at once}
+\end{codebox}
+
+And the AVX version adds 8 numbers with the instruction \code{vaddps ymm0, ymm0, [\dots]}:
+\cfile{ch4/avx.c}
+\screen{ch4/avx.out}
+
+\begin{tashbih}
+    A normal instruction is like a teacher who corrects one exam paper at a time. SIMD is like a teacher who puts
+    8 papers side by side and corrects question 1 on all of them with one move. This is why it is used in image and
+    video processing, games, and artificial intelligence, where we apply the same operation to millions of numbers.
+\end{tashbih}
+
+%================================================
+\section{The instruction cycle and the pipeline}
+%================================================
+
+\subsection{The five stages}
+In modern processors, each instruction is split into stages, and each stage has its own circuit:
+\begin{center}
+\small
+\begin{tabular}{|c|c|l|}
+    \hline
+    \ras{Stage} & \ras{Name} & \ras{Work} \\ \hline
+    IF & fetch & read the instruction from memory (address in RIP) \\ \hline
+    ID & decode & understand the instruction and read the registers \\ \hline
+    EX & execute & compute the result in the UAL, or compute an address \\ \hline
+    MEM & memory & read or write memory if needed \\ \hline
+    WB & write back & store the result in the register \\ \hline
+\end{tabular}
+\end{center}
+
+\subsection{Without a pipeline and with a pipeline}
+\begin{tashbih}
+    In a laundry: washing takes one hour, drying one hour, ironing one hour. To wash 3 bags one after the other we
+    need 9 hours. But when the first bag goes from the washing machine to the dryer, we put the second bag in the
+    washing machine at once. The three machines work together, so we finish in only 5 hours. This is a pipeline.
+\end{tashbih}
+
+\begin{center}
+\begin{tikzpicture}[s/.style={draw=brandDark, minimum width=0.95cm, minimum height=0.55cm, font=\codefont\scriptsize\bfseries}]
+    \node[font=\small\bfseries] at (4.3,0.9) {with a pipeline: 4 instructions in 8 cycles};
+    \foreach \c in {1,...,8} \node[font=\codefont\scriptsize] at (0.95*\c, 0.35) {\c};
+    \foreach \i/\col in {1/brandTeal, 2/brandOrange, 3/brandGreen, 4/brandPurple} {
+        \node[font=\small] at (-0.3,-0.6*\i+0.1) {I\i};
+        \foreach \st [count=\k from 0] in {IF, ID, EX, MEM, WB} {
+            \pgfmathsetmacro\x{0.95*(\i+\k)}
+            \node[s, fill=\col!25] at (\x, -0.6*\i+0.1) {\st};
+        }
+    }
+\end{tikzpicture}
+\end{center}
+
+\begin{tarif}
+    For $n$ instructions and $k$ stages (one cycle per stage):
+    \begin{itemize}
+        \item without a pipeline: $n \times k$ cycles.
+        \item with a pipeline: $k + (n - 1)$ cycles: the first one needs $k$ cycles, then one instruction finishes in \textbf{every} cycle.
+    \end{itemize}
+\end{tarif}
+
+\begin{khatwa}[: 100 instructions in a 5-stage pipeline]
+    \begin{enumerate}
+        \item Without a pipeline: $100 \times 5 = 500$ cycles.
+        \item With a pipeline: $5 + (100 - 1) = 104$ cycles.
+        \item The speed-up: $\dfrac{500}{104} \approx 4.8$ times, close to the number of stages (5).
+    \end{enumerate}
+\end{khatwa}
+
+\subsection{Hazards: when does the pipeline stop?}
+\begin{enumerate}
+    \item \textbf{Data hazard}: \code{add rax, rbx} then \code{add rcx, rax}. The second instruction needs the new RAX,
+          but the first one has not written it yet. The fix: the processor ``forwards'' the result directly from EX to the
+          second instruction, or waits one cycle.
+    \item \textbf{Control hazard}: after \code{jmp} or \code{jne}, the instructions fetched after it may be wrong. The fix:
+          \term{branch prediction}{prédiction de branchement}: the processor guesses if it will jump, and if it guessed wrong,
+          it throws away the wrong instructions and starts again.
+    \item \textbf{Structural hazard}: two instructions need the same circuit in the same cycle (like memory).
+\end{enumerate}
+
+\subsection{Example: \code{mov}, \code{add} and \code{jmp} in 64 bits}
+We follow three instructions from the program \code{same.asm} and the programs of this chapter, with their real bytes:
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{|>{\centering\arraybackslash}p{1.1cm}|>{\raggedright\arraybackslash}p{3.3cm}|R|R|}
+    \hline
+    \ras{Stage} & \ras{\code{mov rax, 60}} & \ras{\code{add rax, rbx}} & \ras{\code{jmp fin}} \\ \hline
+    IF & fetch 7 bytes 48 C7 C0 3C 00 00 00 & fetch 3 bytes 48 01 D8 & fetch 2 bytes EB 00 \\ \hline
+    ID & REX.W: 64 bits, destination RAX, the value 60 is in the instruction & 64 bits, source RBX, destination RAX; read both registers & short jump, offset 0 \\ \hline
+    EX & nothing to compute (the value is ready) & UAL: $\text{RAX} + \text{RBX}$, and compute the flags & compute the target: $\text{RIP} + 0$ \\ \hline
+    MEM & nothing & nothing & nothing \\ \hline
+    WB & \nql{RAX}{60} & RAX gets the result; update RFLAGS & RIP gets the target; throw away wrongly fetched instructions \\ \hline
+\end{tabularx}
+\end{center}
+
+\begin{hal}
+    The Core i7 we used does much more than a 5-stage pipeline: it has more than 14 stages, and it can start
+    \textbf{4 instructions in every cycle}. It even runs them \textbf{out of order} when they do not depend on each
+    other, then puts the results back in order. All this happens without the programmer seeing any difference.
+\end{hal}
+
+%================================================
+\section{Exercises}
+%================================================
+
+\begin{tamrin}
+    How many bytes can a processor address with a 36-bit address? (This is what the PAE extension allowed in 32-bit processors.)
+\end{tamrin}
+\begin{hall}
+    $2^{36} = 2^{6} \times 2^{30} = 64$ GB.
+\end{hall}
+
+\begin{tamrin}
+    RAX = \hex{FFFFFFFFFFFFFFFF}. What is RAX after: (a) \code{mov eax, 1} (b) \code{mov ax, 1} (c) \code{mov al, 1}?
+\end{tamrin}
+\begin{hall}
+    (a) \hex{0000000000000001} (writing 32 bits clears the high half).\\
+    (b) \hex{FFFFFFFFFFFF0001}. \quad (c) \hex{FFFFFFFFFFFFFF01}.
+\end{hall}
+
+\begin{tamrin}
+    An array of \code{int} (4 bytes each) starts at \hex{601000}. What is the address of element number 10? Write the addressing in NASM.
+\end{tamrin}
+\begin{hall}
+    $\hex{601000} + 10 \times 4 = \hex{601000} + 40 = \hex{601028}$. The writing: \code{[tab + rcx*4]} with RCX = 10.
+\end{hall}
+
+\begin{tamrin}
+    A 6-stage pipeline, and 1000 instructions. Compute the number of cycles without and with a pipeline, and the speed-up.
+\end{tamrin}
+\begin{hall}
+    Without: $1000 \times 6 = 6000$. With: $6 + 999 = 1005$. Speed-up $= \dfrac{6000}{1005} \approx 5.97$.
+\end{hall}
+
+\begin{tamrin}
+    In this program, where is the data hazard? \code{mov rax, [x]}, then \code{add rax, 5}, then \code{mov [y], rax}.
+\end{tamrin}
+\begin{hall}
+    The second instruction needs the RAX that the first one reads from memory, and the third one needs the RAX that the
+    second one computes: each instruction depends on the one just before it.
+\end{hall}

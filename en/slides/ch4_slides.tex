@@ -1,0 +1,295 @@
+\documentclass[aspectratio=169, 11pt, t, xcolor={table}]{beamer}
+\input{style}
+\title[Ch. 4: 32-bit and 64-bit processors]{Case Study: 32-bit and 64-bit Processors}
+
+\begin{document}
+
+\cover{Chapter 4}{Case Study: 32-bit and 64-bit Processors}{IA-32, AMD64, registers, flat addressing, SSE/AVX, pipeline}
+
+\begin{frame}{Goals of this chapter}
+    \begin{tbox}{\faBullseye\quad At the end, you can:}
+        \begin{itemize}
+            \item explain what changed from 16 to 32 and 64 bits;
+            \item use the 64-bit registers and the base + index $\times$ scale addressing;
+            \item explain SIMD instructions and the pipeline.
+        \end{itemize}
+    \end{tbox}
+\end{frame}
+
+\begin{frame}{16, 32 or 64 bits?}
+    \begin{center}
+    \small
+    \begin{tabular}{|l|c|c|c|}
+        \hline \ras{} & \ras{8086} & \ras{IA-32} & \ras{x86-64} \\ \hline
+        register size & 16 & 32 & 64 \\ \hline
+        max memory & 1 MB & 4 GB & 256 TB (48 bits) \\ \hline
+        general registers & 8 & 8 & \textbf{16} \\ \hline
+        names & AX & EAX & RAX, \dots, R15 \\ \hline
+        addressing & segmented & flat & flat \\ \hline
+    \end{tabular}
+    \end{center}
+    An \textbf{$n$-bit} processor has $n$-bit general registers.
+\end{frame}
+
+\begin{frame}{Why more than 32 bits?}
+    \begin{enumerate}
+        \item \textbf{Memory}: 32-bit addresses stop at 4 GB.
+        \item \textbf{Performance}: big numbers in one instruction, and 16 registers.
+        \item \textbf{Compatibility}: old 32-bit programs still run.
+    \end{enumerate}
+    \begin{gbox}{\faShoePrints\quad 4 GB exactly}
+        $2^{32} = 2^2 \times 2^{30} = 4$ GB \qquad and \qquad $2^{48} = 2^8 \times 2^{40} = 256$ TB.
+    \end{gbox}
+\end{frame}
+
+\begin{frame}{From IA-32 to AMD64}
+    \begin{center}
+    \begin{tikzpicture}
+        \node[evo=brandMuted] (a) at (0,0) {8086 (1978)\\16 bits};
+        \node[evo=brandPurple] (b) at (3.3,0) {80286 (1982)\\protected};
+        \node[evo=brandTeal] (c) at (6.6,0) {80386 (1985)\\\textbf{IA-32}};
+        \node[evo=brandOrange] (d) at (9.9,0) {AMD64 (2003)\\\textbf{64 bits}};
+        \draw[sahmT] (a) -- (b); \draw[sahmT] (b) -- (c); \draw[sahmT] (c) -- (d);
+    \end{tikzpicture}
+    \end{center}
+    \begin{center}
+    \small
+    \begin{tabular}{|l|l|}
+        \hline \ras{Mode} & \ras{Description} \\ \hline
+        real & like an 8086, at start-up \\ \hline
+        protected & 32 bits, memory protection \\ \hline
+        long & 64 bits, plus a 32-bit compatibility sub-mode \\ \hline
+    \end{tabular}
+    \end{center}
+\end{frame}
+
+\begin{frame}{Nested registers}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.85, transform shape, b/.style={draw=brandDark, thick, minimum height=0.7cm, font=\codefont\bfseries}]
+        \node[b, minimum width=12cm, fill=brandOrange!15, anchor=east] at (6,1.6) {RAX: 64 bits};
+        \node[b, minimum width=6cm, fill=brandTeal!15, anchor=east] at (6,0.8) {EAX: 32 bits};
+        \node[b, minimum width=3cm, fill=brandGreen!20, anchor=east] at (6,0) {AX: 16};
+        \node[b, minimum width=1.5cm, fill=brandPurple!20, anchor=east] at (4.5,-0.8) {AH};
+        \node[b, minimum width=1.5cm, fill=brandPurple!35, anchor=east] at (6,-0.8) {AL};
+        \foreach \x/\t in {6/0, 4.5/8, 3/16, 0/32, -6/64} \node[font=\codefont\scriptsize] at (\x,-1.45) {\t};
+    \end{tikzpicture}
+    \end{center}
+    New: \textbf{R8 to R15}, \textbf{RIP}, \textbf{RFLAGS}.\\ Parameters: RDI, RSI, RDX, RCX; result: RAX.
+\end{frame}
+
+\begin{frame}{A test: what happens to the other bits?}
+    \begin{columns}[T]
+        \column{0.55\textwidth}
+        \asm[firstline=4, firstnumber=4, lastline=18]{ch4/regs64.asm}
+        \column{0.42\textwidth}
+        \screen{ch4/regs64.out}
+        \begin{obox}{\faExclamationTriangle\quad Rule}
+            Writing a \textbf{32-bit} register clears the high 32 bits. Writing 8 or 16 bits keeps them.
+        \end{obox}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{From segments to a flat memory}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.85, transform shape]
+        \draw[thick, fill=brandLight] (-6,0) rectangle (-4,-4);
+        \foreach \y/\c in {0/brandTeal, -1.3/brandOrange, -2.6/brandGreen} \fill[\c!30] (-6,\y) rectangle (-4,\y-1.2);
+        \foreach \y/\t in {-0.6/CS, -1.9/DS, -3.2/SS} \node[font=\codefont] at (-5,\y) {\t};
+        \node[font=\small\bfseries] at (-5,0.5) {segmented (8086)};
+        \draw[thick, fill=brandTeal!15] (0,0) rectangle (2,-4);
+        \node[font=\small, align=center] at (1,-2) {one single\\space};
+        \node[font=\small\bfseries] at (1,0.5) {flat (x86-64)};
+        \draw[sahmO] (-3.6,-2) -- (-0.4,-2);
+    \end{tikzpicture}
+    \end{center}
+    In the \textbf{flat model}, an address is just one number in a 64-bit register.
+\end{frame}
+
+\begin{frame}{The general form of an address}
+    \begin{tbox}{\faLightbulb\quad Rule}
+        \centering address $=$ base $+$ index $\times$ scale $+$ displacement \quad (scale: 1, 2, 4 or 8)
+    \end{tbox}
+    \begin{center}
+    \small
+    \begin{tabular}{|l|l|}
+        \hline \ras{NASM} & \ras{Use} \\ \hline
+        \code{[rbx]} & a pointer \\ \hline
+        \code{[rbx + 16]} & a field in a struct \\ \hline
+        \code{[tab + rcx*8]} & element i of an array of 8-byte numbers \\ \hline
+        \code{[rel msg]} & relative to RIP (64 bits only) \\ \hline
+    \end{tabular}
+    \end{center}
+    \code{[tab + rcx*8]} with RCX = 3 reads $3 \times 8 = 24$ bytes after \code{tab}.
+\end{frame}
+
+\begin{frame}{Example: the sum of an array}
+    \begin{columns}[T]
+        \column{0.55\textwidth}
+        \asm[firstline=4, firstnumber=4, lastline=16]{ch4/sum64.asm}
+        \column{0.42\textwidth}
+        \small
+        \begin{itemize}
+            \item Line 8: scaled index.
+            \item Lines 9--11: \code{while (i < 5)}.
+        \end{itemize}
+        \screen{ch4/sum64.out}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{RIP-relative addressing}
+    \begin{itemize}
+        \item \code{lea rsi, [rel buf]}: the address is $\text{RIP} + \text{distance}$.
+        \item The program works \textbf{wherever} the system loads it.
+        \item This helps security: the system moves programs at each run.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{The same instruction on 16, 32 and 64 bits}
+    \begin{center}
+    \begin{tabular}{|l|l|l|}
+        \hline \ras{Instruction} & \ras{Machine code (real)} & \ras{Note} \\ \hline
+        \code{add ax, bx} & {\codefont \textcolor{orangeDeep}{66} 01 D8} & prefix 66: 16 bits \\ \hline
+        \code{add eax, ebx} & {\codefont 01 D8} & default size \\ \hline
+        \code{add rax, rbx} & {\codefont \textcolor{orangeDeep}{48} 01 D8} & REX.W: 64 bits \\ \hline
+        \code{add r8, r9} & {\codefont \textcolor{orangeDeep}{4D} 01 C8} & REX: new registers \\ \hline
+    \end{tabular}
+    \end{center}
+    01 D8 is the same since the 8086: the new sizes come from a \textbf{prefix}.
+\end{frame}
+
+\begin{frame}{32 bits or 64 bits: hello}
+    \begin{columns}[T]
+        \column{0.49\textwidth}
+        \asms[firstline=8, firstnumber=8, lastline=17]{ch4/hello32.asm}
+        \screen{ch4/hello32.out}
+        \column{0.49\textwidth}
+        \asms[firstline=8, firstnumber=8, lastline=17]{ch4/hello64.asm}
+        \screen{ch4/hello64.out}
+    \end{columns}
+    \small 32 bits: \code{int 0x80}, write = 4, parameters EBX, ECX, EDX. \quad 64 bits: \code{syscall}, write = 1, parameters RDI, RSI, RDX.
+\end{frame}
+
+\begin{frame}{What does the compiler write?}
+    \begin{columns}[T]
+        \column{0.48\textwidth}
+        \cfile{ch4/sum.c}
+        \small \code{gcc -O1 -S -masm=intel sum.c}
+        \column{0.48\textwidth}
+        \asms{ch4/sum_gcc.s}
+    \end{columns}
+    \small \code{t} arrives in RDI, \code{n} in RSI; the result goes back in RAX.
+\end{frame}
+
+\begin{frame}{SIMD: one instruction, several numbers}
+    \begin{center}
+    \begin{tikzpicture}[c/.style={draw=brandDark, thick, minimum width=1.2cm, minimum height=0.6cm, font=\codefont}]
+        \foreach \v [count=\i from 0] in {1.5, 2.5, 3.5, 4.5} \node[c, fill=brandTeal!15] at (1.2*\i,1.5) {\v};
+        \foreach \v [count=\i from 0] in {10, 20, 30, 40} \node[c, fill=brandOrange!15] at (1.2*\i,0.6) {\v};
+        \foreach \v [count=\i from 0] in {11.5, 22.5, 33.5, 44.5} \node[c, fill=brandGreen!20] at (1.2*\i,-0.8) {\v};
+        \draw[very thick] (-0.7,0.1) -- (4.3,0.1);
+        \node[font=\bfseries] at (-1,0.6) {+};
+        \node[font=\small, anchor=west] at (4.6,0.6) {one \code{addps}};
+    \end{tikzpicture}
+    \end{center}
+    \begin{center}
+    \small
+    \begin{tabular}{|c|c|c|c|}
+        \hline \ras{Extension} & \ras{Registers} & \ras{Size} & \ras{floats at once} \\ \hline
+        SSE & XMM & 128 bits & 4 \\ \hline
+        AVX & YMM & 256 bits & 8 \\ \hline
+        AVX-512 & ZMM & 512 bits & 16 \\ \hline
+    \end{tabular}
+    \end{center}
+\end{frame}
+
+\begin{frame}{SSE in a real program}
+    \begin{columns}[T]
+        \column{0.6\textwidth}
+        \cfiles[firstline=5, firstnumber=5, lastline=18]{ch4/simd.c}
+        \column{0.37\textwidth}
+        \screen{ch4/simd.out}
+        \small In the compiled program:\\
+        \code{addps xmm0, [rbp-0x50]}\\[4pt]
+        AVX version: \code{vaddps ymm0, \dots}
+        \screen{ch4/avx.out}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{The five stages}
+    \renewcommand{\arraystretch}{1.12}
+    \begin{center}
+    \begin{tabular}{|c|l|l|}
+        \hline \ras{Stage} & \ras{Name} & \ras{Work} \\ \hline
+        IF & fetch & read the instruction \\ \hline
+        ID & decode & understand it, read registers \\ \hline
+        EX & execute & compute in the UAL \\ \hline
+        MEM & memory & read or write memory \\ \hline
+        WB & write back & store the result \\ \hline
+    \end{tabular}
+    \end{center}
+    \begin{pbox}{\faSmile\quad Analogy}
+        A laundry: wash, dry, iron. The second bag starts while the first one dries.
+    \end{pbox}
+\end{frame}
+
+\begin{frame}{The pipeline}
+    \begin{center}
+    \begin{tikzpicture}[s/.style={draw=brandDark, minimum width=0.95cm, minimum height=0.5cm, font=\codefont\scriptsize\bfseries}]
+        \foreach \c in {1,...,8} \node[font=\codefont\scriptsize] at (0.95*\c, 0.35) {\c};
+        \foreach \i/\col in {1/brandTeal, 2/brandOrange, 3/brandGreen, 4/brandPurple} {
+            \node[font=\small] at (-0.3,-0.55*\i+0.1) {I\i};
+            \foreach \st [count=\k from 0] in {IF, ID, EX, MEM, WB} {
+                \pgfmathsetmacro\x{0.95*(\i+\k)}
+                \node[s, fill=\col!25] at (\x, -0.55*\i+0.1) {\st};
+            }
+        }
+    \end{tikzpicture}
+    \end{center}
+    \begin{tbox}{\faLightbulb\quad Cycles}
+        without: $n \times k$ \qquad with: $k + (n - 1)$. \quad 100 instructions, 5 stages: 500 vs 104 (4.8 times faster).
+    \end{tbox}
+\end{frame}
+
+\begin{frame}{Hazards}
+    \begin{itemize}
+        \item \textbf{Data}: \code{add rax, rbx} then \code{add rcx, rax}: forward the result, or wait.
+        \item \textbf{Control}: after a jump, fetched instructions may be wrong: \textbf{branch prediction}.
+        \item \textbf{Structural}: two instructions need the same circuit at once.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{\code{mov}, \code{add}, \code{jmp} in the pipeline}
+    \begin{center}
+    \small
+    \begin{tabularx}{\linewidth}{|c|L|L|L|}
+        \hline \ras{} & \ras{\code{mov rax, 60}} & \ras{\code{add rax, rbx}} & \ras{\code{jmp fin}} \\ \hline
+        IF & 48 C7 C0 3C 00 00 00 & 48 01 D8 & EB 00 \\ \hline
+        ID & 64 bits, value in the instruction & read RAX and RBX & short jump \\ \hline
+        EX & -- & RAX + RBX, flags & target = RIP + 0 \\ \hline
+        WB & \nql{RAX}{60} & RAX gets the result & RIP gets the target \\ \hline
+    \end{tabularx}
+    \end{center}
+    A Core i7 has 14+ stages, starts 4 instructions per cycle, and runs them out of order.
+\end{frame}
+
+\begin{frame}{Practice}
+    \begin{obox}{\faEdit\quad Try it}
+        \begin{enumerate}
+            \item RAX = \hex{FFFF\dots FFFF}, then \code{mov eax, 1}: RAX? \hfill \textcolor{brandMuted}{\hex{0000000000000001}}
+            \item Address of element 10 of an \code{int} array at \hex{601000}? \hfill \textcolor{brandMuted}{\hex{601028}}
+            \item 1000 instructions, 6 stages: cycles with a pipeline? \hfill \textcolor{brandMuted}{1005}
+        \end{enumerate}
+    \end{obox}
+\end{frame}
+
+\begin{frame}{Summary}
+    \begin{tbox}{\faCheckCircle\quad Remember}
+        \begin{itemize}
+            \item x86-64: 16 registers of 64 bits, flat memory.
+            \item address $=$ base $+$ index $\times$ scale $+$ displacement.
+            \item SIMD: several numbers at once; pipeline: overlapping steps.
+        \end{itemize}
+    \end{tbox}
+\end{frame}
+
+\end{document}
